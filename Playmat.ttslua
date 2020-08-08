@@ -198,23 +198,33 @@ function scry()
   m_scry = m_scry + 1
   local deck = get_deck()
   if deck == nil then print("No deck in library slot") return false end
-  local card = deck.dealToColorWithOffset({-10 + (5*m_scry),5,5}, true, m_color)
+  local card = deck.dealToColorWithOffset({(5*(m_scry%5+1)-15),5,(5+math.ceil(m_scry/5)*5)}, true, m_color)
   card.setHiddenFrom(allBut(m_color))
   card.setLock(true)
   card.setRotation(self.getRotation())
   card.createButton{
     click_function = "scry_top", function_owner = self, label = "Top",
+    position = {2,0,-2}, width = 750, height = 400,
+    color = m_colddor, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_bottom", function_owner = self, label = "Bottom",
     position = {2,0,-1}, width = 750, height = 400,
     color = m_color, font_size = 200
   }
   card.createButton{
-    click_function = "scry_bottom", function_owner = self, label = "Bottom",
+    click_function = "scry_grave", function_owner = self, label = "Grave",
     position = {2,0,0}, width = 750, height = 400,
     color = m_color, font_size = 200
   }
   card.createButton{
-    click_function = "scry_grave", function_owner = self, label = "Grave",
+    click_function = "scry_hand", function_owner = self, label = "Hand",
     position = {2,0,1}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_field", function_owner = self, label = "Field",
+    position = {2,0,2}, width = 750, height = 400,
     color = m_color, font_size = 200
   }
   return true
@@ -241,7 +251,25 @@ function scry_bottom(obj, player_clicker_color, alt_click)
 end
 
 function scry_grave(obj, player_clicker_color, alt_click)
+  obj.setLock(false)
   obj.setPosition(z_grave.positionToWorld({0,1,0}))
+  --obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  m_scry = m_scry - 1
+end
+
+function scry_hand(obj, player_clicker_color, alt_click)
+  obj.deal(1,m_color,1)
+  obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  obj.setLock(false)
+  m_scry = m_scry - 1
+end
+
+function scry_field(obj, player_clicker_color, alt_click)
+  obj.setPosition(z_field.positionToWorld({0,1,0}))
   obj.setRotation(self.getRotation())
   obj.setHiddenFrom({})
   obj.clearButtons()
@@ -270,17 +298,17 @@ function reset()
     end
   end
   for key, object in pairs(z_field.getObjects()) do
-    if object.tag == 'Card' then
+    if object.tag == 'Card' or object.tag == 'Deck' then
       deck.putObject(object)
     end
   end
   for key, object in pairs(z_grave.getObjects()) do
-    if object.tag == 'Card' then
+    if object.tag == 'Card' or object.tag == 'Deck' then
       deck.putObject(object)
     end
   end
   for key, object in pairs(z_exile.getObjects()) do
-    if object.tag == 'Card' then
+    if object.tag == 'Card' or object.tag == 'Deck' then
       deck.putObject(object)
     end
   end
