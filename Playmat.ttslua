@@ -483,31 +483,31 @@ buttons = {
 
 states = {
   function()
-    buttons.start({0,0.5,-1.5})
+    buttons.start({0,0.1,-1.5})
   end,
   function()
-    buttons.ready({0,0.5,-1.5})
-    buttons.mulligan({0,0.5,-0.5})
+    buttons.ready({0,0.1,-1.5})
+    buttons.mulligan({0,0.1,-0.5})
   end,
   function()
-    buttons.upkeep({0,0.5,-1.5})
-    buttons.untap({-0.8,0.5,-0.5})
-    buttons.draw({0.8,0.5,-0.5})
-    buttons.reset({-0.8,0.5,0.5})
-    buttons.scry({0.8,0.5,0.5})
+    buttons.upkeep({0,0.1,-1.5})
+    buttons.untap({-0.8,0.1,-0.5})
+    buttons.draw({0.8,0.1,-0.5})
+    buttons.reset({-0.8,0.1,0.5})
+    buttons.scry({0.8,0.1,0.5})
   end,
   function()
-    buttons.pass({-0.8,-1})
-    buttons.untap({-0.8,0,11})
-    buttons.draw({0.8,0,11})
-    buttons.reset({-0.8,0,12})
-    buttons.scry({0.8,0.5,0.5})
+    buttons.pass({-0.8,0.1,-1})
+    buttons.untap({-0.8,0.1,11})
+    buttons.draw({0.8,0.1,11})
+    buttons.reset({-0.8,0.1,12})
+    buttons.scry({0.8,0.1,0.5})
   end,
   function()
-    buttons.untap({-0.8,0,11})
-    buttons.draw({0.8,0,11})
-    buttons.reset({-0.8,0,12})
-    buttons.scry({0.8,0.5,0.5})
+    buttons.untap({-0.8,0.1,11})
+    buttons.draw({0.8,0.1,11})
+    buttons.reset({-0.8,0.1,12})
+    buttons.scry({0.8,0.1,0.5})
   end
 }
 
