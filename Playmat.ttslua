@@ -78,8 +78,8 @@ function validateObject(_object, _params)
     _object = spawnObject(_params)
     _object.setCustomObject(_params.custom)
   else
-    _object.setPosition(params.position)
-    _object.setRotation(params.rotation)
+    _object.setPosition(_params.position)
+    _object.setRotation(_params.rotation)
   end
   return _object
 end
@@ -154,6 +154,17 @@ function change_playmat()
   --     position = {(0.8-1.6*(key%4)),0.5,(3-math.ceil(key/4))}, width = 600, height = 400
   --   })
   -- end
+end
+
+function count_hand(_color)
+  local handObjects = Player[_color].getHandObjects(1)
+  local objectCount = 0 --set to -1 because an object is still counted as being in hand when it leaves the zone
+  for j, obj in ipairs(handObjects) do
+      if obj.tag == "Card" then
+          objectCount = objectCount+1
+      end
+  end
+  return objectCount
 end
 
 function get_deck()
@@ -500,7 +511,10 @@ states = {
   end
 }
 
-cmf_start = function() if draw(7) then updateControllerModule(2) end end
+cmf_start = function()
+  if count_hand(m_color) > 0 then updateControllerModule(2) return end
+  if draw(7) then updateControllerModule(2) end
+end
 cmf_mulligan = function()
     local deck = get_deck()
     if deck == nil then print("no deck in library slot") end
@@ -677,13 +691,7 @@ function onObjectLeaveScriptingZone(zone, leave_object)
 end
 
 function countHandCards()
-    local handObjects = Player[m_color].getHandObjects(1)
-    local objectCount = 0 --set to -1 because an object is still counted as being in hand when it leaves the zone
-    for j, obj in ipairs(handObjects) do
-        if obj.tag == "Card" then
-            objectCount = objectCount+1
-        end
-    end
+    local objectCount = count_hand(m_color)
     if objectCount > 9 then
         m_handCounter.editButton({
             index = 0,
