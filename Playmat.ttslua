@@ -1,0 +1,702 @@
+m_color = 'Grey'
+m_settings = {}
+
+function onSave()
+  if m_color ~= 'Grey' then
+    local to_save = {
+      color        = m_color,
+      board        = m_board,
+      field        = z_field.getGUID(),
+      exile        = z_exile.getGUID(),
+      library      = z_library.getGUID(),
+      grave        = z_grave.getGUID(),
+      life_counter = m_lifeCounter.getGUID(),
+      life_total   = m_life,
+      hand_counter = m_handCounter.getGUID(),
+      hand_zone    = z_hand.getGUID(),
+      controller   = m_controller.getGUID(),
+      state        = m_state,
+      mat          = m_mat,
+      settings     = m_settings
+    }
+  end
+  m_save = JSON.encode(to_save)
+  return m_save
+end
+
+function onLoad(saved_data)
+  if saved_data ~= "" and saved_data ~= 'null' then
+    local loaded_data = JSON.decode(saved_data)
+    m_color       = loaded_data['color']
+    z_field       = getObjectFromGUID(loaded_data['field'])
+    z_library     = getObjectFromGUID(loaded_data['library'])
+    m_lifeCounter = getObjectFromGUID(loaded_data['life_counter'])
+    m_life        = loaded_data['life_total']
+    m_handCounter = getObjectFromGUID(loaded_data['hand_counter'])
+    z_hand        = getObjectFromGUID(loaded_data['hand_zone'])
+    m_controller  = getObjectFromGUID(loaded_data['controller'])
+    m_state       = loaded_data['state']
+    m_mat         = loaded_data['mat']
+    m_settings    = loaded_data['settings']
+  end
+  if m_life == nil then m_life = 40 end
+  if m_state == nil then m_state = 1 end
+  if m_settings == nil then m_settings.autoupkeep = false end
+  if m_color ~= 'Grey' then
+    init()
+  else
+    for key, color in pairs(Color.list) do
+      if color ~= 'Grey' and color ~= 'Black' then
+        self.createButton({
+          click_function = "set"..color,
+          function_owner = self,
+          position = {(0.8-1.6*(key%2)),0.5,(3-math.ceil(key/2))}, width = 600, height = 400,
+          color = color
+        })
+      end
+    end
+  end
+end
+
+function setWhite()  m_color = "White" init() end
+function setBrown()  setColor("Brown") end
+function setRed()    setColor("Red") end
+function setOrange() setColor("Orange") end
+function setYellow() setColor("Yellow") end
+function setGreen()  setColor("Green") end
+function setTeal()   setColor("Teal") end
+function setBlue()   setColor("Blue") end
+function setPurple() setColor("Purple") end
+function setPink()   setColor("Pink") end
+function setColor(_color)
+  m_color = _color
+  init()
+end
+
+function validateObject(_object, _params)
+  if _object == nil then
+    _object = spawnObject(_params)
+    _object.setCustomObject(_params.custom)
+  else
+    _object.setPosition(params.position)
+    _object.setRotation(params.rotation)
+  end
+  return _object
+end
+
+function init()
+  self.clearButtons()
+  loadBoard()
+  loadLifeModule()
+  loadHandCounter()
+  loadControllerModule()
+
+  z_field = validateObject(z_field, {
+    position = m_board.positionToWorld({2,0,0}),
+    scale = {26, 2, 16},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_exile = validateObject(z_exile, {
+    position = m_board.positionToWorld({-13,0,-2}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_library = validateObject(z_library, {
+    position = m_board.positionToWorld({-13,0,2}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_grave = validateObject(z_grave, {
+    position = m_board.positionToWorld({-13,0,6}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  self.createButton({
+    click_function = "toggle_autoupkeep", function_owner = self, label = "Auto Upkeep Off",
+    position = {0,0.2,1}, width = 1500, height = 400,
+    color = "Red", hover_color = "Grey", font_size = 200
+  })
+
+  -- self.createButton({
+  --   click_function = "change_playmat", function_owner = self, label = "Change Playmat",
+  --   position = {0,0.2,0}, width = 1500, height = 400,
+  --   color = m_color, font_size = 200
+  -- })
+end
+
+function toggle_autoupkeep()
+  if m_settings.autoupkeep == true then
+    m_settings.autoupkeep = false
+    self.editButton({color = "Red", label = "Auto Upkeep Off"})
+  else
+    m_settings.autoupkeep = true
+    self.editButton({color = "Green", label = "Auto Upkeep On"})
+  end
+end
+
+function change_playmat()
+  broadcaseToColor("Not implemented", m_color, {0,0,0})
+  -- playmat_functions = {}
+  -- for key, object in pairs(m_mats) do
+  --   playmat_functions[object.name] = function() setMat(key) end
+  --   m_board.createButton({
+  --     click_function = "playmat_functions."..object.name,
+  --     function_owner = self,
+  --     label = object.name,
+  --     position = {(0.8-1.6*(key%4)),0.5,(3-math.ceil(key/4))}, width = 600, height = 400
+  --   })
+  -- end
+end
+
+function get_deck()
+  local objects = z_library.getObjects()
+  for key, object in pairs(objects) do
+    if object.tag == 'Deck' then
+      return object
+    end
+  end
+  return nil
+end
+
+function draw(i)
+  local deck = get_deck()
+  if deck == nil then print("No deck in library slot") return false end
+  deck.deal(i,m_color,1) return true
+end
+
+function allBut(_color)
+  local players = {}
+  for key, color in pairs(Color.list) do
+    if color ~= _color then
+      table.insert(players,color)
+    end
+  end
+  return players
+end
+
+m_scry = 0
+function scry()
+  m_scry = m_scry + 1
+  local deck = get_deck()
+  if deck == nil then print("No deck in library slot") return false end
+  local card = deck.dealToColorWithOffset({-10 + (5*m_scry),5,5}, true, m_color)
+  card.setHiddenFrom(allBut(m_color))
+  card.setLock(true)
+  card.setRotation(self.getRotation())
+  card.createButton{
+    click_function = "scry_top", function_owner = self, label = "Top",
+    position = {2,0,-1}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_bottom", function_owner = self, label = "Bottom",
+    position = {2,0,0}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_grave", function_owner = self, label = "Grave",
+    position = {2,0,1}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  return true
+end
+
+function scry_top(obj, player_clicker_color, alt_click)
+  obj.setPosition(z_library.positionToWorld({0,1,0}))
+  obj.clearButtons()
+  local deck = get_deck()
+  if deck == nil then print("No deck in library slot") return false end
+  obj.setLock(false)
+  deck.putObject(obj)
+  m_scry = m_scry - 1
+end
+
+function scry_bottom(obj, player_clicker_color, alt_click)
+  obj.setPosition(z_library.positionToWorld({0,-1,0}))
+  obj.clearButtons()
+  local deck = get_deck()
+  if deck == nil then print("No deck in library slot") return false end
+  obj.setLock(false)
+  deck.putObject(obj)
+  m_scry = m_scry - 1
+end
+
+function scry_grave(obj, player_clicker_color, alt_click)
+  obj.setPosition(z_grave.positionToWorld({0,1,0}))
+  obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  obj.setLock(false)
+  m_scry = m_scry - 1
+end
+
+function untap()
+  local objects = z_field.getObjects()
+  for key, object in pairs(objects) do
+    if object.tag == 'Card'
+    then
+      local old = object.getRotation()
+      object.setRotationSmooth(Vector(old.x,self.getRotation().y,old.z))
+    end
+  end
+end
+
+function reset()
+  m_life = 40
+  updateDisplay()
+  local deck = get_deck()
+  for key, object in pairs(Player[m_color].getHandObjects()) do
+    if object.tag == 'Card' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(z_field.getObjects()) do
+    if object.tag == 'Card' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(z_grave.getObjects()) do
+    if object.tag == 'Card' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(z_exile.getObjects()) do
+    if object.tag == 'Card' then
+      deck.putObject(object)
+    end
+  end
+  updateControllerModule(1)
+end
+
+function onPlayerTurnStart(player_color_start, player_color_previous)
+  if player_color_start == m_color then
+    if m_life > 0 and m_state > 2 then
+      m_turnTimer = spawnObject({
+        type     = '3DText',
+        position = self.getPosition() + Vector(-19,1,15),
+        rotation = self.getRotation()
+      })
+      m_time = 0
+      if m_settings.autoupkeep then
+        untap()
+        draw(1)
+        updateControllerModule(4)
+      else
+        updateControllerModule(3)
+      end
+    else
+      Turns.turn_color = Turns.getNextTurnColor()
+    end
+  elseif player_color_previous == m_color then
+    destroyObject(m_turnTimer)
+    updateControllerModule(5)
+  end
+end
+
+function onUpdate()
+  if m_turnTimer ~= nil then
+    m_time = m_time + Time.delta_time
+    m_turnTimer.setValue(m_time)
+  end
+end
+
+--===============================
+--= Begin code for board module =
+--===============================
+m_mat = 1
+m_mats = {
+  {
+    name = "Blue Flower Girl",
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933732895894968/A887F7CFA1DAA52784B29DAF86363D12DE4F3D45/'
+  },
+  {
+    name = 'White lotus',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933361191004624/6FFAE7ABB7CB77288F988CE7DD92A9DE87C71774/'
+  },
+  {
+    name = 'Orange Lotus',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414067188/9B8DB9FDFBF1025FF0B5719F0D88A19AD1E7712D/'
+  },
+  {
+    name = 'Lilly Pad',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414206699/2CDF1F95BA2E67135DA17C31A2894AF62D5543AE/'
+  },
+  {
+    name = 'Abstract Nature 1',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970959612/C50D157BA6659FFAF875A4F0BBCA83E0F7DB60DE/'
+  },
+  {
+    name = 'Abstract Nature 2',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970962283/8C2566B9BC067FD0204023CD4F99815962E1EE46/'
+  },
+  {
+    name = 'Mando',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970964639/66D3F178D638784A189A6CF2554BB580BCCF5E23/'
+  },
+  {
+    name = 'Blossom',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970965840/4E1C4A8B67DB15397C16C9825B34E09AD23D2767/'
+  },
+  {
+    name = 'Rain Leaf',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414206699/2CDF1F95BA2E67135DA17C31A2894AF62D5543AE/'
+  },
+  {
+    name = 'Anime Lotus Fairy',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970969811/18FA0CEFCD92A17B10E478D391DFADCC58B17810/'
+  }
+}
+
+function setMat(i)
+  print("set Mat: "..i)
+  m_mat = i
+  if m_board == nil then return end
+  destroyObject(m_board)
+  loadBoard()
+end
+
+function loadBoard()
+  m_board = validateObject(m_board, {
+    type = 'Custom_Board',
+    position = self.positionToWorld({-14,0,-12}),
+    rotation = self.getRotation(),
+    custom = m_mats[m_mat+1]
+  })
+  m_board.setColorTint(m_color)
+
+  snaps = {
+    {
+      name             = 'Commander',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895811754/0757B585D889D50233F95FC1487787E2F6C3BCD9/",
+      position         = {-7.25,1,-6},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Exile',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895820463/46A4F9B08D508C6E27B54978769CFDE75C956235/",
+      position         = {-7.25,1,-2},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Library',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895808328/410945C66D37436B9D80CFC75406C57F643B5A2F/",
+      position         = {-7.25,1,2},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Graveyard',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933361190728243/C5192B1FBEA31B75D2B6874C1FF6FEF41AA4849C/",
+      position         = {-7.25,1,6},
+      rotation         = {90,180,0}
+    }
+  }
+
+  m_board.setDecals(snaps)
+  m_board.setSnapPoints(snaps)
+  m_board.interactable = false
+end
+
+--====================================
+--= Begin code for controller module =
+--====================================
+
+function loadControllerModule()
+  m_controller = validateObject(m_controller, {
+    type = 'Custom_Token',
+    position = self.positionToWorld({-28,0,0}),
+    rotation = self.getRotation(),
+    custom = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
+    }
+  })
+  updateControllerModule(m_state)
+  m_controller.interactable = false
+  m_controller.setLock(true)
+end
+
+buttons = {
+  start = function(pos) m_controller.createButton({
+    click_function = "cmf_start", function_owner = self, label = "Start",
+    position = pos, width = 1300, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  ready = function(pos) m_controller.createButton({
+    click_function = "cmf_ready", function_owner = self, label = "Ready",
+    position = pos, width = 1300, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  mulligan = function(pos) m_controller.createButton({
+    click_function = "cmf_mulligan", function_owner = self, label = "Mulligan",
+    position = pos, width = 1300, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  upkeep = function(pos) m_controller.createButton({
+    click_function = "cmf_upkeep", function_owner = self, label = "Upkeep",
+    position = pos, width = 1300, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  untap = function(pos) m_controller.createButton({
+    click_function = "cmf_untap", function_owner = self, label = "Untap",
+    position = pos, width = 600, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  draw = function(pos) m_controller.createButton({
+    click_function = "cmf_draw", function_owner = self, label = "Draw",
+    position = pos, width = 600, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  reset = function(pos) m_controller.createButton({
+    click_function = "cmf_reset", function_owner = self, label = "Reset",
+    position = pos, width = 600, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  pass = function(pos) m_controller.createButton({
+    click_function = "cmf_pass", function_owner = self, label = "Pass",
+    position = pos, width = 1300, height = 400,
+    color = m_color, font_size = 200
+  }) end,
+  scry = function(pos) m_controller.createButton({
+    click_function = "cmf_scry", function_owner = self, label = "Scry",
+    position = pos, width = 600, height = 400,
+    color = m_color, font_size = 200
+  }) end
+}
+
+states = {
+  function()
+    buttons.start({0,0.5,-1.5})
+  end,
+  function()
+    buttons.ready({0,0.5,-1.5})
+    buttons.mulligan({0,0.5,-0.5})
+  end,
+  function()
+    buttons.upkeep({0,0.5,-1.5})
+    buttons.untap({-0.8,0.5,-0.5})
+    buttons.draw({0.8,0.5,-0.5})
+    buttons.reset({-0.8,0.5,0.5})
+    buttons.scry({0.8,0.5,0.5})
+  end,
+  function()
+    buttons.pass({-0.8,-1})
+    buttons.untap({-0.8,0,11})
+    buttons.draw({0.8,0,11})
+    buttons.reset({-0.8,0,12})
+    buttons.scry({0.8,0.5,0.5})
+  end,
+  function()
+    buttons.untap({-0.8,0,11})
+    buttons.draw({0.8,0,11})
+    buttons.reset({-0.8,0,12})
+    buttons.scry({0.8,0.5,0.5})
+  end
+}
+
+cmf_start = function() if draw(7) then updateControllerModule(2) end end
+cmf_mulligan = function()
+    local deck = get_deck()
+    if deck == nil then print("no deck in library slot") end
+    for key, object in pairs(Player[m_color].getHandObjects()) do
+      if object.tag == 'Card' then deck.putObject(object) end
+    end
+    deck.shuffle()
+    Wait.time(function() draw(7) end, 0.5, 1) end
+cmf_ready = function() updateControllerModule(3) end
+cmf_draw = function() draw(1) end
+cmf_untap = function() untap() end
+cmf_reset = function() reset() end
+cmf_upkeep = function() untap() draw(1) end
+cmf_scry = function() scry(1) end
+
+function updateControllerModule(state)
+  m_state = state
+  m_controller.clearButtons()
+  states[m_state]()
+end
+
+--==============================
+--= Begin code for life module =
+--==============================
+function loadLifeModule()
+  m_lifeCounter = validateObject(m_lifeCounter, {
+    type     = 'Custom_Token',
+    position = self.positionToWorld({0,0,-25}),
+    rotation = self.getRotation(),
+    custom   = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
+    }
+  })
+  m_lifeCounter.setLock(true)
+  m_lifeCounter.interactable = false
+  m_lifeCounter.setColorTint(m_color)
+
+  b_display={
+    index = 0,
+    click_function = 'add_subtract',
+    function_owner = self,
+    label = tostring(m_life),
+    color={0, 0, 0, 1},
+    font_color={255, 255, 255, 1},
+    position = {-0,0.1,-0.25},
+    tooltip="Total Life",
+    width = 900,
+    height = 600,
+    font_size = 700
+  }
+  m_lifeCounter.createButton(b_display)
+  m_lifeCounter.createButton({
+    click_function = 'increase5',
+    function_owner = self,
+    label =  '+5',
+    color={0, 0, 0, 1},
+    font_color={255, 255, 255, 1},
+    position = {1.2,0.1,-0.45},
+    tooltip="+5 Life",
+    width = 250,
+    height = 240,
+    font_size = 280
+ })
+ m_lifeCounter.createButton({
+    click_function = 'decrease5',
+    function_owner = self, label =  '-5',
+    color={0, 0, 0, 1},
+    font_color={255, 255, 255, 1},
+    position = {-1.3,0.1,-0.45},
+    tooltip="-5 Life",
+    width = 250,
+    height = 240,
+    font_size = 280
+  })
+  m_lifeCounter.createButton({
+    click_function = 'life_reset',
+    function_owner = self,
+    label =  '{R}',
+    color={0, 0, 0, 1},
+    font_color={255, 255, 255, 1},
+    position = {-0.0,0.1,0.70},
+    tooltip="Reset Life",
+    width = 190,
+    height = 180,
+    font_size = 180
+  })
+end
+
+function increase5()
+  m_life = m_life + 5
+  updateDisplay()
+end
+
+function decrease5()
+  m_life = m_life - 5
+  updateDisplay()
+end
+
+function life_reset()
+  m_life = 40
+  updateDisplay()
+end
+
+function add_subtract(_obj, _color, alt_click)
+  if alt_click then
+    m_life = m_life - 1
+  else
+    m_life = m_life + 1
+  end
+  updateDisplay()
+end
+
+function updateDisplay()
+  --m_life = math.min(math.max(m_life, 999), -99)
+  if m_life >= 99 then
+    b_display.font_size = 585
+  else
+    b_display.font_size = 700
+  end
+  b_display.label = tostring(m_life)
+  m_lifeCounter.editButton(b_display)
+end
+
+--======================================
+--= Begin code for hand counter module =
+--======================================
+function loadHandCounter()
+  m_handCounter = validateObject(m_handCounter, {
+    type     = 'Custom_Token',
+    position = self.positionToWorld({-28,0,-25}),
+    rotation = self.getRotation(),
+    custom   = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1011566237274824037/BDFCF49DA08C225C34C3438FC76F8FA0DAF9E3FA/'
+    }
+  })
+  m_handCounter.setLock(true)
+  m_handCounter.interactable = false
+  m_handCounter.setColorTint(m_color)
+
+  if z_hand == nil then
+    local handTransform = Player[m_color].getHandTransform(1)
+    z_hand = spawnObject({
+        type              = "ScriptingTrigger",
+        position          = handTransform.position,
+        rotation          = handTransform.rotation,
+        scale             = handTransform.scale,
+    })
+  end
+  m_handCounter.createButton({
+      click_function = "null", function_owner = self,
+      label = "0",
+      color = m_color,
+      position = {0, 0.2, 0},
+      width = 600, height = 800, font_size = 1100
+  })
+end
+
+function onObjectEnterScriptingZone(zone, enter_object)
+    if zone == z_hand then
+        if timerID ~= nil then --checks so we don't try to stop a non ID and get an error
+            Wait.stop(timerID)
+        end
+        timerID = Wait.time(|| countHandCards(), 0.15, 0) --Add a timer to prevent errors of cards being counted while still in transit
+    end
+end
+
+function onObjectLeaveScriptingZone(zone, leave_object)
+    if zone == z_hand then
+        if timerID ~= "" then --checks so we don't try to stop a non ID and get an error
+            Wait.stop(timerID)
+        end
+        timerID = Wait.time(|| countHandCards(), 0.15, 0) --Add a timer to prevent errors of cards being counted while still in transit
+    end
+end
+
+function countHandCards()
+    local handObjects = Player[m_color].getHandObjects(1)
+    local objectCount = 0 --set to -1 because an object is still counted as being in hand when it leaves the zone
+    for j, obj in ipairs(handObjects) do
+        if obj.tag == "Card" then
+            objectCount = objectCount+1
+        end
+    end
+    if objectCount > 9 then
+        m_handCounter.editButton({
+            index = 0,
+            label = objectCount,
+            tooltip = objectCount.." cards in hand",
+            width = 900
+        })
+    else
+        m_handCounter.editButton({
+            index = 0,
+            label = objectCount,
+            tooltip = objectCount.." cards in hand",
+            width = 600
+        })
+    end
+end
