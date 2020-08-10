@@ -412,44 +412,44 @@ end
 
 m_data.mats = {
   {
-    name = "Blue Flower Girl",
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933732895894968/A887F7CFA1DAA52784B29DAF86363D12DE4F3D45/'
+    name = "Blue",
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065023704/EC3CAEC481AC88C48A65DD5217C28BB2B831A268/'
   },
   {
-    name = 'White lotus',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933361191004624/6FFAE7ABB7CB77288F988CE7DD92A9DE87C71774/'
+    name = 'White',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065031777/37698F67AC1FC23EEFFC5139096E0B45380DB125/'
   },
   {
-    name = 'Orange Lotus',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414067188/9B8DB9FDFBF1025FF0B5719F0D88A19AD1E7712D/'
+    name = 'Green',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065093001/8B4EC8CF2E4D0F25152B941DA4F67BCB6250E1F0/'
   },
   {
-    name = 'Lilly Pad',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414206699/2CDF1F95BA2E67135DA17C31A2894AF62D5543AE/'
+    name = 'Red',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065095714/EF6A45E01EC8617C62E4AC14D183E76B37BEBFA5/'
   },
   {
-    name = 'Abstract Nature 1',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970959612/C50D157BA6659FFAF875A4F0BBCA83E0F7DB60DE/'
+    name = 'Pink',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065098818/6FE5D66E4B5F0D13B2499B9A4F4F67038BE8CD7C/'
   },
   {
-    name = 'Abstract Nature 2',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970962283/8C2566B9BC067FD0204023CD4F99815962E1EE46/'
+    name = 'Teal',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065102580/635816A0009B20F7D2A06556D3CDC3D21EFC7F50/'
   },
   {
-    name = 'Mando',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970964639/66D3F178D638784A189A6CF2554BB580BCCF5E23/'
+    name = 'Purple',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065106112/0CF0296DFBCC60A2B2C3F2A3976C699648CAD9FF/'
   },
   {
-    name = 'Blossom',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970965840/4E1C4A8B67DB15397C16C9825B34E09AD23D2767/'
+    name = 'Yellow',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065107760/8E4A04D578BF6628946DCF26B381DCC627A2A9E2/'
   },
   {
-    name = 'Rain Leaf',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933821414206699/2CDF1F95BA2E67135DA17C31A2894AF62D5543AE/'
+    name = 'Orange',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065110625/295ED3432B485AC015E1D3E2DE86CEE4127934AC/'
   },
   {
-    name = 'Anime Lotus Fairy',
-    image = 'http://cloud-3.steamusercontent.com/ugc/1461933996970969811/18FA0CEFCD92A17B10E478D391DFADCC58B17810/'
+    name = 'Brown',
+    image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065113460/24C65D16A19E192DA6681AFE08E657954741942E/'
   }
 }
 
