@@ -1,17 +1,19 @@
 m_color = 'Grey'
 m_settings = {}
+m_data = {
+  color = 'Grey',
+  settings = {},
+  objects = {},
+  counters = {}
+}
 
 function onSave()
-  if m_color ~= 'Grey' then
-    local to_save = {
-      color        = m_color,
-      board        = m_board,
+  if m_data.color ~= 'Grey' then
+    m_data.to_save = {
       field        = z_field.getGUID(),
       exile        = z_exile.getGUID(),
       library      = z_library.getGUID(),
       grave        = z_grave.getGUID(),
-      life_counter = m_lifeCounter.getGUID(),
-      life_total   = m_life,
       hand_counter = m_handCounter.getGUID(),
       hand_zone    = z_hand.getGUID(),
       controller   = m_controller.getGUID(),
@@ -20,18 +22,17 @@ function onSave()
       settings     = m_settings
     }
   end
-  m_save = JSON.encode(to_save)
-  return m_save
+  save = JSON.encode(m_data)
+  return save
 end
 
 function onLoad(saved_data)
   if saved_data ~= "" and saved_data ~= 'null' then
-    local loaded_data = JSON.decode(saved_data)
-    m_color       = loaded_data['color']
+    m_data = JSON.decode(saved_data)
+    m_color       = m_data.color
+    local loaded_data = m_data.to_save
     z_field       = getObjectFromGUID(loaded_data['field'])
     z_library     = getObjectFromGUID(loaded_data['library'])
-    m_lifeCounter = getObjectFromGUID(loaded_data['life_counter'])
-    m_life        = loaded_data['life_total']
     m_handCounter = getObjectFromGUID(loaded_data['hand_counter'])
     z_hand        = getObjectFromGUID(loaded_data['hand_zone'])
     m_controller  = getObjectFromGUID(loaded_data['controller'])
@@ -39,7 +40,6 @@ function onLoad(saved_data)
     m_mat         = loaded_data['mat']
     m_settings    = loaded_data['settings']
   end
-  if m_life == nil then m_life = 40 end
   if m_state == nil then m_state = 1 end
   if m_settings == nil then m_settings.autoupkeep = false end
   if m_color ~= 'Grey' then
@@ -58,7 +58,7 @@ function onLoad(saved_data)
   end
 end
 
-function setWhite()  m_color = "White" init() end
+function setWhite()  setColor("White") end
 function setBrown()  setColor("Brown") end
 function setRed()    setColor("Red") end
 function setOrange() setColor("Orange") end
@@ -70,6 +70,7 @@ function setPurple() setColor("Purple") end
 function setPink()   setColor("Pink") end
 function setColor(_color)
   m_color = _color
+  m_data.color = _color
   init()
 end
 
@@ -85,9 +86,23 @@ function validateObject(_object, _params)
 end
 
 function init()
+  local playMats = Global.getTable("playMats")
+  if playMats == nil then playMats = {} end
+  for key, mat in pairs(playMats) do
+    loadCounter('CMDR_'..key)
+    mat.call("loadCounter", 'CMDR_'..m_color)
+  end
+  if playMats[m_color] ~= nil then
+    return
+  else
+    playMats[m_color] = self
+  end
+  Global.setTable("playMats", playMats)
+
   self.clearButtons()
   loadBoard()
-  loadLifeModule()
+  --loadLifeModule()
+  loadCounter('Life')
   loadHandCounter()
   loadControllerModule()
 
@@ -119,17 +134,21 @@ function init()
     rotation = m_board.getRotation()
   })
 
+  reset_controller()
+end
+
+function reset_controller()
+  self.clearButtons()
   self.createButton({
     click_function = "toggle_autoupkeep", function_owner = self, label = "Auto Upkeep Off",
     position = {0,0.2,1}, width = 1500, height = 400,
     color = "Red", hover_color = "Grey", font_size = 200
   })
-
-  -- self.createButton({
-  --   click_function = "change_playmat", function_owner = self, label = "Change Playmat",
-  --   position = {0,0.2,0}, width = 1500, height = 400,
-  --   color = m_color, font_size = 200
-  -- })
+  self.createButton({
+    click_function = "change_playmat", function_owner = self, label = "Change Playmat",
+    position = {0,0.2,0}, width = 1500, height = 400,
+    color = m_color, font_size = 200
+  })
 end
 
 function toggle_autoupkeep()
@@ -140,20 +159,6 @@ function toggle_autoupkeep()
     m_settings.autoupkeep = true
     self.editButton({color = "Green", label = "Auto Upkeep On"})
   end
-end
-
-function change_playmat()
-  broadcaseToColor("Not implemented", m_color, {0,0,0})
-  -- playmat_functions = {}
-  -- for key, object in pairs(m_mats) do
-  --   playmat_functions[object.name] = function() setMat(key) end
-  --   m_board.createButton({
-  --     click_function = "playmat_functions."..object.name,
-  --     function_owner = self,
-  --     label = object.name,
-  --     position = {(0.8-1.6*(key%4)),0.5,(3-math.ceil(key/4))}, width = 600, height = 400
-  --   })
-  -- end
 end
 
 function count_hand(_color)
@@ -179,7 +184,10 @@ end
 
 function draw(i)
   local deck = get_deck()
-  if deck == nil then print("No deck in library slot") return false end
+  if deck == nil then
+    broadcastToColor("No deck in library slot", m_color)
+    return false
+  end
   deck.deal(i,m_color,1) return true
 end
 
@@ -197,7 +205,10 @@ m_scry = 0
 function scry()
   m_scry = m_scry + 1
   local deck = get_deck()
-  if deck == nil then print("No deck in library slot") return false end
+  if deck == nil then
+    broadcastToColor("No deck in library slot", m_color)
+    return false
+  end
   local card = deck.dealToColorWithOffset({(5*(m_scry%5+1)-15),5,(5+math.ceil(m_scry/5)*5)}, true, m_color)
   card.setHiddenFrom(allBut(m_color))
   card.setLock(true)
@@ -234,7 +245,10 @@ function scry_top(obj, player_clicker_color, alt_click)
   obj.setPosition(z_library.positionToWorld({0,1,0}))
   obj.clearButtons()
   local deck = get_deck()
-  if deck == nil then print("No deck in library slot") return false end
+  if deck == nil then
+    broadcastToColor("No deck in library slot", m_color)
+    return false
+  end
   obj.setLock(false)
   deck.putObject(obj)
   m_scry = m_scry - 1
@@ -244,7 +258,10 @@ function scry_bottom(obj, player_clicker_color, alt_click)
   obj.setPosition(z_library.positionToWorld({0,-1,0}))
   obj.clearButtons()
   local deck = get_deck()
-  if deck == nil then print("No deck in library slot") return false end
+  if deck == nil then
+    broadcastToColor("No deck in library slot", m_color)
+    return false
+  end
   obj.setLock(false)
   deck.putObject(obj)
   m_scry = m_scry - 1
@@ -289,8 +306,11 @@ function untap()
 end
 
 function reset()
-  m_life = 40
+  m_data.counters['Life'].val = 40
   updateDisplay()
+  for key, counter in pairs(m_counters) do
+    ctr_reset(counter)
+  end
   local deck = get_deck()
   for key, object in pairs(Player[m_color].getHandObjects()) do
     if object.tag == 'Card' then
@@ -317,7 +337,7 @@ end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
   if player_color_start == m_color then
-    if m_life > 0 and m_state > 2 then
+    if m_data.counters['Life'].val > 0 and m_state > 2 then
       m_turnTimer = spawnObject({
         type     = '3DText',
         position = self.getPosition() + Vector(-19,1,15),
@@ -350,7 +370,53 @@ end
 --===============================
 --= Begin code for board module =
 --===============================
-m_mat = 1
+
+function loadBoard()
+  m_board = getObjectFromGUID(m_data.objects.board)
+  m_board = validateObject(m_board, {
+    type = 'Custom_Board',
+    position = self.positionToWorld({-14,0,-12}),
+    rotation = self.getRotation(),
+    custom = m_mats[m_mat+1],
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(m_color)
+    end
+  })
+  m_data.objects.board = m_board.getGUID()
+
+  snaps = {
+    {
+      name             = 'Commander',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895811754/0757B585D889D50233F95FC1487787E2F6C3BCD9/",
+      position         = {-7.25,1,-6},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Exile',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895820463/46A4F9B08D508C6E27B54978769CFDE75C956235/",
+      position         = {-7.25,1,-2},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Library',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895808328/410945C66D37436B9D80CFC75406C57F643B5A2F/",
+      position         = {-7.25,1,2},
+      rotation         = {90,180,0}
+    },
+    {
+      name             = 'Graveyard',
+      url              = "http://cloud-3.steamusercontent.com/ugc/1461933361190728243/C5192B1FBEA31B75D2B6874C1FF6FEF41AA4849C/",
+      position         = {-7.25,1,6},
+      rotation         = {90,180,0}
+    }
+  }
+
+  m_board.setDecals(snaps)
+  m_board.setSnapPoints(snaps)
+end
+
 m_mats = {
   {
     name = "Blue Flower Girl",
@@ -394,53 +460,53 @@ m_mats = {
   }
 }
 
+mats_max = 0
+for key, pair in ipairs(m_mats) do
+  mats_max = mats_max + 1
+end
+
+m_mat = 1
 function setMat(i)
-  print("set Mat: "..i)
+  if i >= mats_max then i = mats_max - 1 end
+  if i < 0 then i = 0 end
   m_mat = i
-  if m_board == nil then return end
-  destroyObject(m_board)
+  if m_board ~= nil then
+    m_board.setPosition({0,0,0})
+    destroyObject(m_board)
+  end
+  m_data.objects.board = nil
   loadBoard()
 end
 
-function loadBoard()
-  m_board = validateObject(m_board, {
-    type = 'Custom_Board',
-    position = self.positionToWorld({-14,0,-12}),
-    rotation = self.getRotation(),
-    custom = m_mats[m_mat+1]
+
+function change_playmat()
+  self.clearButtons()
+
+  self.createButton({
+    click_function = "next_mat", function_owner = self, label = ">",
+    position = {0.8,0.2,0}, width = 600, height = 400,
+    color = m_color, font_size = 200
   })
-  m_board.setColorTint(m_color)
 
-  snaps = {
-    {
-      name             = 'Commander',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895811754/0757B585D889D50233F95FC1487787E2F6C3BCD9/",
-      position         = {-7.25,1,-6},
-      rotation         = {90,180,0}
-    },
-    {
-      name             = 'Exile',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895820463/46A4F9B08D508C6E27B54978769CFDE75C956235/",
-      position         = {-7.25,1,-2},
-      rotation         = {90,180,0}
-    },
-    {
-      name             = 'Library',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895808328/410945C66D37436B9D80CFC75406C57F643B5A2F/",
-      position         = {-7.25,1,2},
-      rotation         = {90,180,0}
-    },
-    {
-      name             = 'Graveyard',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933361190728243/C5192B1FBEA31B75D2B6874C1FF6FEF41AA4849C/",
-      position         = {-7.25,1,6},
-      rotation         = {90,180,0}
-    }
-  }
+  self.createButton({
+    click_function = "prev_mat", function_owner = self, label = "<",
+    position = {-0.8,0.2,0}, width = 600, height = 400,
+    color = m_color, font_size = 200
+  })
 
-  m_board.setDecals(snaps)
-  m_board.setSnapPoints(snaps)
-  m_board.interactable = false
+  self.createButton({
+    click_function = "reset_controller", function_owner = self, label = "Confirm",
+    position = {0,0.2,-1}, width = 1500, height = 400,
+    color = m_color, font_size = 200
+  })
+end
+
+function next_mat()
+  setMat(m_mat + 1)
+end
+
+function prev_mat()
+  setMat(m_mat - 1)
 end
 
 --====================================
@@ -497,6 +563,16 @@ buttons = {
     position = pos, width = 600, height = 400,
     color = m_color, font_size = 200
   }) end,
+  reset_confirm = function(pos) m_controller.createButton({
+    click_function = "cmf_reset_confirm", function_owner = self, label = "Reset",
+    position = pos, width = 1300, height = 400,
+    color = "Red", font_size = 200
+  }) end,
+  reset_cancel = function(pos) m_controller.createButton({
+    click_function = "cmf_reset_cancel", function_owner = self, label = "Cancel",
+    position = pos, width = 1300, height = 400,
+    color = "White", font_size = 200
+  }) end,
   pass = function(pos) m_controller.createButton({
     click_function = "cmf_pass", function_owner = self, label = "Pass",
     position = pos, width = 1300, height = 400,
@@ -536,6 +612,10 @@ states = {
     buttons.draw({0.8,0.1,11})
     buttons.reset({-0.8,0.1,12})
     buttons.scry({0.8,0.1,0.5})
+  end,
+  function()
+    buttons.reset_confirm({0,0.1,-1.5})
+    buttons.reset_cancel({0,0.1,-0.5})
   end
 }
 
@@ -544,17 +624,20 @@ cmf_start = function()
   if draw(7) then updateControllerModule(2) end
 end
 cmf_mulligan = function()
-    local deck = get_deck()
-    if deck == nil then print("no deck in library slot") end
-    for key, object in pairs(Player[m_color].getHandObjects()) do
-      if object.tag == 'Card' then deck.putObject(object) end
-    end
-    deck.shuffle()
-    Wait.time(function() draw(7) end, 0.5, 1) end
+  local deck = get_deck()
+  if deck == nil then print("no deck in library slot") end
+  for key, object in pairs(Player[m_color].getHandObjects()) do
+    if object.tag == 'Card' then deck.putObject(object) end
+  end
+  deck.shuffle()
+  Wait.time(function() draw(7) end, 0.3, 1)
+end
 cmf_ready = function() updateControllerModule(3) end
 cmf_draw = function() draw(1) end
 cmf_untap = function() untap() end
-cmf_reset = function() reset() end
+cmf_reset = function() m_state_last = m_state updateControllerModule(6) end
+cmf_reset_confirm = function() reset() end
+cmf_reset_cancel = function() updateControllerModule(m_state_last) end
 cmf_upkeep = function() untap() draw(1) end
 cmf_scry = function() scry(1) end
 
@@ -564,115 +647,13 @@ function updateControllerModule(state)
   states[m_state]()
 end
 
---==============================
---= Begin code for life module =
---==============================
-function loadLifeModule()
-  m_lifeCounter = validateObject(m_lifeCounter, {
-    type     = 'Custom_Token',
-    position = self.positionToWorld({0,0,-25}),
-    rotation = self.getRotation(),
-    custom   = {
-      image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
-    }
-  })
-  m_lifeCounter.setLock(true)
-  m_lifeCounter.interactable = false
-  m_lifeCounter.setColorTint(m_color)
-
-  b_display={
-    index = 0,
-    click_function = 'add_subtract',
-    function_owner = self,
-    label = tostring(m_life),
-    color={0, 0, 0, 1},
-    font_color={255, 255, 255, 1},
-    position = {-0,0.1,-0.25},
-    tooltip="Total Life",
-    width = 900,
-    height = 600,
-    font_size = 700
-  }
-  m_lifeCounter.createButton(b_display)
-  m_lifeCounter.createButton({
-    click_function = 'increase5',
-    function_owner = self,
-    label =  '+5',
-    color={0, 0, 0, 1},
-    font_color={255, 255, 255, 1},
-    position = {1.2,0.1,-0.45},
-    tooltip="+5 Life",
-    width = 250,
-    height = 240,
-    font_size = 280
- })
- m_lifeCounter.createButton({
-    click_function = 'decrease5',
-    function_owner = self, label =  '-5',
-    color={0, 0, 0, 1},
-    font_color={255, 255, 255, 1},
-    position = {-1.3,0.1,-0.45},
-    tooltip="-5 Life",
-    width = 250,
-    height = 240,
-    font_size = 280
-  })
-  m_lifeCounter.createButton({
-    click_function = 'life_reset',
-    function_owner = self,
-    label =  '{R}',
-    color={0, 0, 0, 1},
-    font_color={255, 255, 255, 1},
-    position = {-0.0,0.1,0.70},
-    tooltip="Reset Life",
-    width = 190,
-    height = 180,
-    font_size = 180
-  })
-end
-
-function increase5()
-  m_life = m_life + 5
-  updateDisplay()
-end
-
-function decrease5()
-  m_life = m_life - 5
-  updateDisplay()
-end
-
-function life_reset()
-  m_life = 40
-  updateDisplay()
-end
-
-function add_subtract(_obj, _color, alt_click)
-  if alt_click then
-    m_life = m_life - 1
-  else
-    m_life = m_life + 1
-  end
-  updateDisplay()
-end
-
-function updateDisplay()
-  --m_life = math.min(math.max(m_life, 999), -99)
-  if m_life >= 99 then
-    b_display.font_size = 585
-  else
-    b_display.font_size = 700
-  end
-  b_display.label = tostring(m_life)
-  m_lifeCounter.editButton(b_display)
-end
-
 --======================================
 --= Begin code for hand counter module =
 --======================================
 function loadHandCounter()
   m_handCounter = validateObject(m_handCounter, {
     type     = 'Custom_Token',
-    position = self.positionToWorld({-28,0,-25}),
+    position = self.positionToWorld({-28,0,-23}),
     rotation = self.getRotation(),
     custom   = {
       image = 'http://cloud-3.steamusercontent.com/ugc/1011566237274824037/BDFCF49DA08C225C34C3438FC76F8FA0DAF9E3FA/'
@@ -735,4 +716,180 @@ function countHandCards()
             width = 600
         })
     end
+end
+
+--==========================================
+--= Begin code for special counters module =
+--==========================================
+m_counters = {}
+count_CMDR = 0
+
+function getColorIndex(_color)
+  for key, color in ipairs(Color.list) do
+    if color == _color then return key end
+  end
+end
+
+function ctr_update(_obj)
+  local val = m_data.counters[_obj.getName()].val
+  local update = {index = 0, label = tostring(val)}
+  if val >= 99 then
+    update.font_size = 585
+  else
+    update.font_size = 700
+  end
+  _obj.editButton(update)
+end
+
+function ctr_add5(_obj)
+  m_data.counters[_obj.getName()].val = m_data.counters[_obj.getName()].val + 5
+  ctr_update(_obj)
+end
+
+function ctr_sub5(_obj)
+  m_data.counters[_obj.getName()].val = m_data.counters[_obj.getName()].val - 5
+  ctr_update(_obj)
+end
+
+function ctr_reset(_obj)
+  local name = _obj.getName()
+  if string.sub(name,1,4) == "Life" then
+    m_data.counters[_obj.getName()].val = 40
+  else
+    m_data.counters[_obj.getName()].val = 0
+  end
+  ctr_update(_obj)
+end
+
+function ctr_addsub(_obj, _color, alt_click)
+  if alt_click then
+    m_data.counters[_obj.getName()].val = m_data.counters[_obj.getName()].val - 1
+  else
+    m_data.counters[_obj.getName()].val = m_data.counters[_obj.getName()].val + 1
+  end
+  ctr_update(_obj)
+end
+
+function loadCounter(_counter)
+  if m_data.counters[_counter] == nil
+  then
+    m_data.counters[_counter] = {}
+  else
+    m_counters[_counter] = getObjectFromGUID(m_data.counters[_counter].obj)
+  end
+  local counter = {
+    type = 'Custom_Token',
+    rotation = self.getRotation(),
+    custom = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1008185551998055475/15F69038D7C6043496AE49ED55B41A0ABF4EC670/'
+    }}
+
+  if string.sub(_counter,1,5) == "CMDR_" then
+    count_CMDR = count_CMDR + 1
+    local color = string.sub(_counter,6,-1)
+    counter.position = self.positionToWorld({-2*count_CMDR,0,-22})
+    counter.scale = {0.5,0.5,0.5}
+    counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1009313481328783631/DDCC83524ED154C1F937AC5319E4903077E4A335/'
+    counter.callback_function = function(_obj)
+      _obj.setName(_counter)
+      if m_data.counters[_obj.getName()].val == nil then m_data.counters[_obj.getName()].val = 0 end
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(color)
+      _obj.createButton({
+        click_function = 'ctr_addsub',
+        function_owner = self,
+        label = tostring(m_data.counters[_obj.getName()].val),
+        color = color,
+        position = {-0,0.1,-0.25},
+        tooltip= "Total Life",
+        width = 900,
+        height = 600,
+        font_size = 700
+      })
+      _obj.createButton({
+        click_function = 'ctr_add5',
+        function_owner = self,
+        label = '+5',
+        color = color,
+        position = {1.1,0.1,0.45},
+        tooltip="+5 Life",
+        width = 250,
+        height = 240,
+        font_size = 280
+     })
+      _obj.createButton({
+        click_function = 'ctr_reset',
+        function_owner = self,
+        label =  '{R}',
+        color=color,
+        position = {-0.0,0.1,1.0},
+        tooltip="Reset Life",
+        width = 190,
+        height = 180,
+        font_size = 180
+      })
+    end
+  elseif string.sub(_counter,1,4) == "Life" then
+    counter.position = self.positionToWorld({0,0,-24})
+    counter.custom   = {
+        image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
+      }
+    counter.callback_function = function(_obj)
+      _obj.setName(_counter)
+      if m_data.counters[_obj.getName()].val == nil then m_data.counters[_obj.getName()].val = 40 end
+      _obj.setLock(true)
+      _obj.interactable = false
+      _obj.setColorTint(m_color)
+      _obj.createButton({
+        click_function = 'ctr_addsub',
+        function_owner = self,
+        label = tostring(m_data.counters[_obj.getName()].val),
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {-0,0.1,-0.25},
+        tooltip="Total Life",
+        width = 900,
+        height = 600,
+        font_size = 700
+      })
+      _obj.createButton({
+        click_function = 'ctr_add5',
+        function_owner = self,
+        label =  '+5',
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {1.2,0.1,-0.45},
+        tooltip="+5 Life",
+        width = 250,
+        height = 240,
+        font_size = 280
+     })
+     _obj.createButton({
+        click_function = 'ctr_sub5',
+        function_owner = self, label =  '-5',
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {-1.3,0.1,-0.45},
+        tooltip="-5 Life",
+        width = 250,
+        height = 240,
+        font_size = 280
+      })
+      _obj.createButton({
+        click_function = 'ctr_reset',
+        function_owner = self,
+        label =  '{R}',
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {-0.0,0.1,0.70},
+        tooltip="Reset Life",
+        width = 190,
+        height = 180,
+        font_size = 180
+      })
+    end
+  end
+  m_counters[_counter] = validateObject(m_counters[_counter], counter)
+  m_data.counters[_counter].obj = m_counters[_counter].getGUID()
 end
