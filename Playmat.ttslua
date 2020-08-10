@@ -1,5 +1,4 @@
 m_color = 'Grey'
-m_settings = {}
 m_data = {
   color = 'Grey',
   settings = {},
@@ -16,10 +15,7 @@ function onSave()
       grave        = z_grave.getGUID(),
       hand_counter = m_handCounter.getGUID(),
       hand_zone    = z_hand.getGUID(),
-      controller   = m_controller.getGUID(),
-      state        = m_state,
-      mat          = m_mat,
-      settings     = m_settings
+      controller   = m_controller.getGUID()
     }
   end
   save = JSON.encode(m_data)
@@ -36,12 +32,9 @@ function onLoad(saved_data)
     m_handCounter = getObjectFromGUID(loaded_data['hand_counter'])
     z_hand        = getObjectFromGUID(loaded_data['hand_zone'])
     m_controller  = getObjectFromGUID(loaded_data['controller'])
-    m_state       = loaded_data['state']
-    m_mat         = loaded_data['mat']
-    m_settings    = loaded_data['settings']
   end
-  if m_state == nil then m_state = 1 end
-  if m_settings == nil then m_settings.autoupkeep = false end
+  if m_data.state == nil then m_data.state = 1 end
+  if m_data.settings.autoupkeep == nil then m_data.settings.autoupkeep = false end
   if m_color ~= 'Grey' then
     init()
   else
@@ -152,11 +145,11 @@ function reset_controller()
 end
 
 function toggle_autoupkeep()
-  if m_settings.autoupkeep == true then
-    m_settings.autoupkeep = false
+  if m_data.settings.autoupkeep == true then
+    m_data.settings.autoupkeep = false
     self.editButton({color = "Red", label = "Auto Upkeep Off"})
   else
-    m_settings.autoupkeep = true
+    m_data.settings.autoupkeep = true
     self.editButton({color = "Green", label = "Auto Upkeep On"})
   end
 end
@@ -337,14 +330,14 @@ end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
   if player_color_start == m_color then
-    if m_data.counters['Life'].val > 0 and m_state > 2 then
+    if m_data.counters['Life'].val > 0 and m_data.state > 2 then
       m_turnTimer = spawnObject({
         type     = '3DText',
         position = self.getPosition() + Vector(-19,1,15),
         rotation = self.getRotation()
       })
       m_time = 0
-      if m_settings.autoupkeep then
+      if m_data.settings.autoupkeep then
         untap()
         draw(1)
         updateControllerModule(4)
@@ -377,7 +370,7 @@ function loadBoard()
     type = 'Custom_Board',
     position = self.positionToWorld({-14,0,-12}),
     rotation = self.getRotation(),
-    custom = m_mats[m_mat+1],
+    custom = m_data.mats[m_data.mat+1],
     callback_function = function(_obj)
       _obj.interactable = false
       _obj.setLock(true)
@@ -417,7 +410,7 @@ function loadBoard()
   m_board.setSnapPoints(snaps)
 end
 
-m_mats = {
+m_data.mats = {
   {
     name = "Blue Flower Girl",
     image = 'http://cloud-3.steamusercontent.com/ugc/1461933732895894968/A887F7CFA1DAA52784B29DAF86363D12DE4F3D45/'
@@ -461,15 +454,15 @@ m_mats = {
 }
 
 mats_max = 0
-for key, pair in ipairs(m_mats) do
+for key, pair in ipairs(m_data.mats) do
   mats_max = mats_max + 1
 end
 
-m_mat = 1
+m_data.mat = 1
 function setMat(i)
   if i >= mats_max then i = mats_max - 1 end
   if i < 0 then i = 0 end
-  m_mat = i
+  m_data.mat = i
   if m_board ~= nil then
     m_board.setPosition({0,0,0})
     destroyObject(m_board)
@@ -502,11 +495,11 @@ function change_playmat()
 end
 
 function next_mat()
-  setMat(m_mat + 1)
+  setMat(m_data.mat + 1)
 end
 
 function prev_mat()
-  setMat(m_mat - 1)
+  setMat(m_data.mat - 1)
 end
 
 --====================================
@@ -522,7 +515,7 @@ function loadControllerModule()
       image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
     }
   })
-  updateControllerModule(m_state)
+  updateControllerModule(m_data.state)
   m_controller.interactable = false
   m_controller.setLock(true)
 end
@@ -635,16 +628,16 @@ end
 cmf_ready = function() updateControllerModule(3) end
 cmf_draw = function() draw(1) end
 cmf_untap = function() untap() end
-cmf_reset = function() m_state_last = m_state updateControllerModule(6) end
+cmf_reset = function() m_data.state_last = m_data.state updateControllerModule(6) end
 cmf_reset_confirm = function() reset() end
-cmf_reset_cancel = function() updateControllerModule(m_state_last) end
+cmf_reset_cancel = function() updateControllerModule(m_data.state_last) end
 cmf_upkeep = function() untap() draw(1) end
 cmf_scry = function() scry(1) end
 
 function updateControllerModule(state)
-  m_state = state
+  m_data.state = state
   m_controller.clearButtons()
-  states[m_state]()
+  states[m_data.state]()
 end
 
 --======================================
