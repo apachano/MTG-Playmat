@@ -17,7 +17,7 @@ function onSave()
 end
 
 function onLoad(saved_data)
-  if saved_data ~= "" and saved_data ~= 'null' and saved_date ~= nil then
+  if saved_data ~= "" then
     m_data = JSON.decode(saved_data)
     m_color = m_data.color
   end
@@ -67,17 +67,23 @@ function setColor(_color)
 end
 
 function validateObject(_name, _params)
-  _object = getObjectFromGUID(m_data.objects[_name])
+  _params = _params
+  _name = _name
+  local _object = getObjectFromGUID(m_data.objects[_name])
   if _object == nil then
     _object = spawnObject(_params)
     _object.setCustomObject(_params.custom)
   else
     _object.setPosition(_params.position)
     _object.setRotation(_params.rotation)
+    Wait.time(function() _params.callback_function(_object) end, 0.6)
   end
   m_data.objects[_name] = _object.getGUID()
+  Wait.time(function() stashObject(_name, _object) end, 0.6)
   return _object
 end
+
+function stashObject(_name, _obj)  end
 
 function init()
   local playMats = Global.getTable("playMats")
@@ -117,7 +123,7 @@ end
 function get_deck()
   local objects = z_library.getObjects()
   for key, object in pairs(objects) do
-    if object.tag == 'Deck' or obj.tag == "Card" then
+    if object.tag == 'Deck' then
       return object
     end
   end
@@ -248,7 +254,6 @@ function untap()
 end
 
 function reset()
-  m_data.counters['Life'] = 40
   updateDisplay()
   for key, counter in pairs(m_counters) do
     ctr_reset(counter)
@@ -309,137 +314,26 @@ function onUpdate()
   end
 end
 
---===============================
---= Begin code for board module =
---===============================
+--==================================
+--= Begin generic code for modules =
+--==================================
 
-function loadBoard()
-  local _custom = default_mats[m_color] or default_mats['White']
-  if m_data.custom.mats ~= nil then _custom = m_data.custom.mats[m_data.mat] end
-  m_board = validateObject("m_board", {
-    type = 'Custom_Board',
-    position = self.positionToWorld({-14,0,-12}),
-    rotation = self.getRotation(),
-    custom = _custom,
-    callback_function = function(_obj)
-      _obj.interactable = false
-      _obj.setLock(true)
-      _obj.setColorTint(m_color)
-    end
-  })
-
-  local snaps = {
-    {
-      name             = 'Exile',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895820463/46A4F9B08D508C6E27B54978769CFDE75C956235/",
-      position         = {-7.25,1,-5},
-      rotation         = {90,180,0}
-    },
-    {
-      name             = 'Library',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895808328/410945C66D37436B9D80CFC75406C57F643B5A2F/",
-      position         = {-7.25,1,0},
-      rotation         = {90,180,0}
-    },
-    {
-      name             = 'Graveyard',
-      url              = "http://cloud-3.steamusercontent.com/ugc/1461933361190728243/C5192B1FBEA31B75D2B6874C1FF6FEF41AA4849C/",
-      position         = {-7.25,1,5},
-      rotation         = {90,180,0}
-    }
-  }
-
-  m_board.setDecals(snaps)
-  m_board.setSnapPoints(snaps)
-
-  z_field = validateObject("z_field", {
-    position = m_board.positionToWorld({1,0,0}),
-    scale = {26, 2, 16},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_exile = validateObject("z_exile", {
-    position = m_board.positionToWorld({-7.25,0,-5}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_library = validateObject("z_library", {
-    position = m_board.positionToWorld({-7.25,0,0}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_grave = validateObject("z_grave", {
-    position = m_board.positionToWorld({-7.25,0,5}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
+mb_confirm = function(_func, _row)
+  _row = _row or 1
+  self.createButton({click_function = _func, function_owner = self, label = "Confirm",
+  position = {0,0.1,-2.5 + _row}, width = 1500, height = 400, color = "Green", font_size = 200})
 end
 
-default_mats = {
-  Blue   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065023704/EC3CAEC481AC88C48A65DD5217C28BB2B831A268/'},
-  White  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065031777/37698F67AC1FC23EEFFC5139096E0B45380DB125/'},
-  Green  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065093001/8B4EC8CF2E4D0F25152B941DA4F67BCB6250E1F0/'},
-  Red    = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065095714/EF6A45E01EC8617C62E4AC14D183E76B37BEBFA5/'},
-  Pink   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065098818/6FE5D66E4B5F0D13B2499B9A4F4F67038BE8CD7C/'},
-  Teal   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065102580/635816A0009B20F7D2A06556D3CDC3D21EFC7F50/'},
-  Purple = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065106112/0CF0296DFBCC60A2B2C3F2A3976C699648CAD9FF/'},
-  Yellow = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065107760/8E4A04D578BF6628946DCF26B381DCC627A2A9E2/'},
-  Orange = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065110625/295ED3432B485AC015E1D3E2DE86CEE4127934AC/'},
-  Brown  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065113460/24C65D16A19E192DA6681AFE08E657954741942E/'}
-}
-
-mats_max = 0
-
-m_data.mat = 1
-function setMat(i)
-  if i >= mats_max then i = mats_max - 1 end
-  if i <= 0 then i = 1 end
-  m_data.mat = i
-  if m_board ~= nil then
-    m_board.setPosition({0,0,0})
-    destroyObject(m_board)
-  end
-  m_data.objects.board = nil
-  loadBoard()
+mb_back = function(_func, _row)
+  _row = _row or 1
+  self.createButton({click_function = _func, function_owner = self, label = "<- Back",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
 end
 
-function change_playmat()
-  max_mats = 0
-  for key, pair in ipairs(m_data.custom.mats) do
-    mats_max = mats_max + 1
-  end
-  self.clearButtons()
-  self.createButton({
-    click_function = "next_mat", function_owner = self, label = ">",
-    position = {0.8,0.2,0}, width = 600, height = 400,
-    color = m_color, font_size = 200
-  })
-
-  self.createButton({
-    click_function = "prev_mat", function_owner = self, label = "<",
-    position = {-0.8,0.2,0}, width = 600, height = 400,
-    color = m_color, font_size = 200
-  })
-
-  self.createButton({
-    click_function = "reset_settings_module", function_owner = self, label = "Confirm",
-    position = {0,0.2,-1}, width = 1500, height = 400,
-    color = m_color, font_size = 200
-  })
-end
-
-function next_mat()
-  setMat(m_data.mat + 1)
-end
-
-function prev_mat()
-  setMat(m_data.mat - 1)
+mb_cancel = function(_func, _row)
+  _row = _row or 1
+  self.createButton({click_function = _func, function_owner = self, label = "Cancel",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
 end
 
 --==================================
@@ -452,10 +346,26 @@ function check_importer()
   reset_settings_module()
 end
 
-smf_settings   = function() settings_module_state = 2 reset_settings_module() end
+mf_mat_switchStamp = function()
+  if m_data.mat == 0 then return end
+  if mat_stamp_color == "Black" then mat_stamp_color = "White"
+  else mat_stamp_color = "Black" end
+  m_data.custom.mats[m_data.mat].decal_exile = mat_stamp_color
+  m_data.custom.mats[m_data.mat].decal_library = mat_stamp_color
+  m_data.custom.mats[m_data.mat].decal_grave = mat_stamp_color
+  loadBoardDecals()
+end
+smb_mat_switch_stamp = function(_row)
+  self.createButton({
+    click_function = "mf_mat_switchStamp", function_owner = self, label = "Change Stamps",
+    position = {0,0.1,-2.5 + _row}, width = 1500, height = 400,
+    color = m_color, font_size = 200
+  })
+end
+smf_settings = function() settings_module_state = 2 reset_settings_module() end
 smb_back = function() self.createButton({
     click_function = "smf_back", function_owner = self, label = "<- Back",
-    position = {0,0.2,-1.5}, width = 1500, height = 400,
+    position = {0,0.1,-1.5}, width = 1500, height = 400,
     color = m_color, font_size = 200}) end
 smf_back       = function() settings_module_state = 1 reset_settings_module() end
 smf_autoupkeep = function()
@@ -542,13 +452,11 @@ function reset_settings_module()
       color = _color,
       hover_color = "Grey", font_size = 200
     })
-    if m_data.custom.mats ~= nil then
-      self.createButton({
-        click_function = "change_playmat", function_owner = self, label = "Change Playmat",
-        position = {0,0.2,0.5}, width = 1500, height = 400,
-        color = m_color, font_size = 200
-      })
-    end
+    self.createButton({
+      click_function = "change_playmat", function_owner = self, label = "Change Playmat",
+      position = {0,0.2,0.5}, width = 1500, height = 400,
+      color = m_color, font_size = 200
+    })
   end
 end
 
@@ -690,16 +598,223 @@ function updateControllerModule(state)
   states[m_data.state]()
 end
 
+--===============================
+--= Begin code for board module =
+--===============================
+
+function loadBoard()
+  local _custom = default_mats[m_color] or default_mats['White']
+  if m_data.custom.mats ~= nil and m_data.mat ~= 0 then
+    _custom = m_data.custom.mats[m_data.mat] end
+  m_board = validateObject("m_board", {
+    type = 'Custom_Board',
+    position = self.positionToWorld({-14,0,-12}),
+    rotation = self.getRotation(),
+    custom = _custom,
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(m_color)
+      loadBoardDecals()
+    end
+  })
+
+  z_field = validateObject("z_field", {
+    position = m_board.positionToWorld({2,0,0}),
+    scale = {26, 2, 16},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_exile = validateObject("z_exile", {
+    position = m_board.positionToWorld({-13,0,-5}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_library = validateObject("z_library", {
+    position = m_board.positionToWorld({-13,0,0}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+
+  z_grave = validateObject("z_grave", {
+    position = m_board.positionToWorld({-13,0,5}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_board.getRotation()
+  })
+end
+
+function loadBoardDecals()
+  if m_data.custom.mats ~= nil then
+    if m_data.mat == 0 then
+      m_decals[1].url = default_stamps.exile["Black"]
+      m_decals[2].url = default_stamps.library["Black"]
+      m_decals[3].url = default_stamps.grave["Black"]
+    else
+      _custom = m_data.custom.mats[m_data.mat]
+      if _custom ~= nil then
+        m_decals[1].url = default_stamps.exile[_custom.decal_exile or "Black"]
+        m_decals[2].url = default_stamps.library[_custom.decal_library or "Black"]
+        m_decals[3].url = default_stamps.grave[_custom.decal_grave or "Black"]
+      end
+    end
+  end
+  m_board.setDecals(m_decals)
+  m_board.setSnapPoints(m_decals)
+end
+
+default_stamps = {
+  exile = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925379188/08F2802D9AB897AC20B95C8F781F769BCA893EE3/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072144/EC7D6388A9B6BB1C2B1C8D68B0D1D5DC78AE2692/"
+  },
+  library = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925380653/82495D1D3C027EF623CC6AE073C0935CC8B4E257/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930073327/271089824932FDD367ED9030390C36A5CE6FB150/"
+  },
+  grave = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925381462/7EB0FF42A570C86E172EA7E4DE82ED152ABABA45/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072957/B9143AB2C0A0F4ADE9AF75092D91F91C3262B5EA/"
+  }
+}
+
+m_decals = {
+  {
+    name     = 'Exile',
+    url      = default_stamps.exile["Black"],
+    position = {-7.25,1,-5},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  },
+  {
+    name     = 'Library',
+    url      = default_stamps.library["Black"],
+    position = {-7.25,1,0},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  },
+  {
+    name     = 'Graveyard',
+    url      = default_stamps.grave["Black"],
+    position = {-7.25,1,5},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  }
+}
+
+default_mats = {
+  Blue   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065023704/EC3CAEC481AC88C48A65DD5217C28BB2B831A268/'},
+  White  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065031777/37698F67AC1FC23EEFFC5139096E0B45380DB125/'},
+  Green  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065093001/8B4EC8CF2E4D0F25152B941DA4F67BCB6250E1F0/'},
+  Red    = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065095714/EF6A45E01EC8617C62E4AC14D183E76B37BEBFA5/'},
+  Pink   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065098818/6FE5D66E4B5F0D13B2499B9A4F4F67038BE8CD7C/'},
+  Teal   = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065102580/635816A0009B20F7D2A06556D3CDC3D21EFC7F50/'},
+  Purple = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065106112/0CF0296DFBCC60A2B2C3F2A3976C699648CAD9FF/'},
+  Yellow = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065107760/8E4A04D578BF6628946DCF26B381DCC627A2A9E2/'},
+  Orange = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065110625/295ED3432B485AC015E1D3E2DE86CEE4127934AC/'},
+  Brown  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065113460/24C65D16A19E192DA6681AFE08E657954741942E/'}
+}
+
+mats_max = 0
+m_data.mat = 0
+function setMat(i)
+  m_data.mat = i
+  if m_board ~= nil then
+    m_board.setPosition({0,0,0})
+    destroyObject(m_board)
+  end
+  m_data.objects.board = nil
+  loadBoard()
+end
+
+function change_playmat()
+  max_mats = 0
+  self.clearButtons()
+  mb_confirm("reset_settings_module")
+  if Player[m_color].host then
+    self.createButton({
+      click_function = "new_mat", function_owner = self, label = "New",
+      position = {0,0.2,-0.5}, width = 1500, height = 400,
+      color = m_color, font_size = 200
+    })
+  end
+  if m_data.custom.mats ~= nil then
+    for key, pair in ipairs(m_data.custom.mats) do
+      mats_max = mats_max + 1
+    end
+    if mats_max > 0 then
+      self.createButton({
+        click_function = "next_mat", function_owner = self, label = ">",
+        position = {0.8,0.2,0.5}, width = 600, height = 400,
+        color = m_color, font_size = 200
+      })
+      self.createButton({
+        click_function = "prev_mat", function_owner = self, label = "<",
+        position = {-0.8,0.2,0.5}, width = 600, height = 400,
+        color = m_color, font_size = 200
+      })
+      self.createButton({
+        click_function = "edit_mat", function_owner = self, label = "Edit",
+        position = {0,0.2,1.5}, width = 1500, height = 400,
+        color = m_color, font_size = 200
+      })
+    end
+  end
+end
+
+function next_mat()
+  local i = m_data.mat + 1
+  if i >= mats_max then i = mats_max end
+  setMat(i)
+end
+
+function prev_mat()
+  local i = m_data.mat - 1
+  if i < 0 then i = 0 end
+  setMat(i)
+end
+
+function new_mat()
+  if m_data.custom.mats == nil then m_data.custom.mats = {} end
+  m_data.custom.mats[max_mats + 1] = {}
+  setMat(max_mats + 1)
+  m_data.custom.mats[m_data.mat].image = m_board.getCustomObject().image
+  self.clearButtons()
+  smb_mat_switch_stamp(2)
+  mb_confirm("change_playmat", 4)
+end
+
+function edit_mat()
+  self.clearButtons()
+  smb_mat_switch_stamp(2)
+  mb_confirm("change_playmat")
+  self.createButton({
+    click_function = "delete_mat", function_owner = self, label = "Delete",
+    position = {0,0.2,1.5}, width = 1500, height = 400,
+    color = "Red", font_size = 200
+  })
+end
+
+function delete_mat()
+  table.remove(m_data.custom.mats, m_data.mat)
+  setMat(m_data.mat - 1)
+  change_playmat()
+end
+
 --======================================
 --= Begin code for hand counter module =
 --======================================
 function loadHandCounter()
   m_handCounter = validateObject("m_handCounter", {
     type     = 'Custom_Token',
-    position = self.positionToWorld({-28,0,-23}),
+    position = self.positionToWorld({-28,0,-23.5}),
     rotation = self.getRotation(),
     custom   = {
-      image = 'http://cloud-3.steamusercontent.com/ugc/1011566237274824037/BDFCF49DA08C225C34C3438FC76F8FA0DAF9E3FA/'
+      image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925321835/014E3BB81BA94FB745E015ED14BFE7A56A85D753/'
     }
   })
   m_handCounter.setLock(true)
@@ -718,14 +833,15 @@ function loadHandCounter()
   m_handCounter.createButton({
       click_function = "null", function_owner = self,
       label = "0",
-      color = m_color,
-      position = {0, 0.2, 0},
+      color = {0,0,0,1},
+      font_color={255, 255, 255, 1},
+      position = {0.25, 0.2, 0},
       width = 600, height = 800, font_size = 1100
   })
 end
 
 function countHandCardsEvent()
-  if timer_hand ~= "" then --checks so we don't try to stop a non ID and get an error
+  if timer_hand ~= nil then --checks so we don't try to stop a non ID and get an error
       Wait.stop(timer_hand)
   end
   timer_hand = Wait.time(|| countHandCards(), 0.15, 0) --Add a timer to prevent errors of cards being counted while still in transit
@@ -813,9 +929,9 @@ function loadCounter(_counter)
   if string.sub(_counter,1,5) == "CMDR_" then
     count_CMDR = count_CMDR + 1
     local color = string.sub(_counter,6,-1)
-    counter.position = self.positionToWorld({-2*count_CMDR,0,-22})
-    counter.scale = {0.5,0.5,0.5}
-    counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1009313481328783631/DDCC83524ED154C1F937AC5319E4903077E4A335/'
+    counter.position = self.positionToWorld({(-2*count_CMDR)-0.5,0,-22.5})
+    counter.scale = {0.6,0.5,0.6}
+    counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925336741/8093D79A732508151203B3B14F9198E830347F8E/'
     counter.callback_function = function(_obj)
       _obj.setName(_counter)
       if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
@@ -826,8 +942,9 @@ function loadCounter(_counter)
         click_function = 'ctr_addsub',
         function_owner = self,
         label = tostring(m_data.counters[_obj.getName()]),
-        color = color,
-        position = {-0,0.1,-0.25},
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {0,0.1,0},
         tooltip= "Total Life",
         width = 900,
         height = 600,
@@ -837,27 +954,29 @@ function loadCounter(_counter)
         click_function = 'ctr_add5',
         function_owner = self,
         label = '+5',
-        color = color,
-        position = {1.1,0.1,0.45},
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {0.7,0.1,1.0},
         tooltip="+5 Life",
-        width = 250,
-        height = 240,
+        width = 300,
+        height = 300,
         font_size = 280
      })
       _obj.createButton({
         click_function = 'ctr_reset',
         function_owner = self,
         label =  '{R}',
-        color=color,
-        position = {-0.0,0.1,1.0},
+        color={0, 0, 0, 1},
+        font_color={255, 255, 255, 1},
+        position = {-0.7,0.1,1.0},
         tooltip="Reset Life",
-        width = 190,
-        height = 180,
+        width = 300,
+        height = 300,
         font_size = 180
       })
     end
   elseif string.sub(_counter,1,4) == "Life" then
-    counter.position = self.positionToWorld({0,0,-24})
+    counter.position = self.positionToWorld({0,0,-23.5})
     counter.custom   = {
         image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
       }
@@ -916,29 +1035,28 @@ function loadCounter(_counter)
       })
     end
   elseif string.sub(_counter,1,8) == "CMD_Zone" then
-    counter.type     = 'Custom_Token'
-    counter.position = self.positionToWorld({-23,0,-23})
-    counter.rotation = self.getRotation()
+    counter.position = self.positionToWorld({-23,0,-23.5})
+    --counter.scale = {1, 0.5, 1.7}
     counter.custom   = {
-        image = 'http://cloud-3.steamusercontent.com/ugc/1461933361190756318/E1F92D2901E7B8F8FE8D4108FAA8D597BBB7B37F/'
+        image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925315472/C2EB85D1C3D7D43FB9B8AD673631F18C6C169AF7/'
       }
     counter.callback_function = function(_obj)
       _obj.setName(_counter)
       if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
-      _obj.interactable = false
       _obj.setLock(true)
+      _obj.interactable = false
       _obj.setColorTint(m_color)
       local snaps = {
         {
           name             = 'Commander1',
-          url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895811754/0757B585D889D50233F95FC1487787E2F6C3BCD9/",
-          position         = {-1.5,0.101,0},
+          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
+          position         = {-1.6,0.25,0},
           rotation         = {90,180,0}
         },
         {
           name             = 'Commander2',
-          url              = "http://cloud-3.steamusercontent.com/ugc/1461933732895811754/0757B585D889D50233F95FC1487787E2F6C3BCD9/",
-          position         = {1.5,0.101,0},
+          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
+          position         = {1.6,0.25,0},
           rotation         = {90,180,0}
         }
       }
@@ -947,8 +1065,8 @@ function loadCounter(_counter)
       _obj.createButton({
         click_function = 'ctr_addsub', function_owner = self,
         label = tostring(m_data.counters[_obj.getName()]),
-        color=m_color, position = {0,0.1,0},
-        width = 400, height = 400, font_size = 400
+        color = {0,0,0,1}, font_color={255, 255, 255, 1},
+        position = {0,0.1,0}, width = 400, height = 400, font_size = 400
       })
     end
   end
