@@ -1,4 +1,5 @@
-m_mats = {}
+m_place = {}
+m_data = {}
 
 --=================================
 --= Template data                 =
@@ -6,16 +7,6 @@ m_mats = {}
 
 t_data = {
   table_size = 0
-}
-
-t_cushion = {
-  assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
-  type = 4, material = 0
-}
-
-t_floorpad = {
-  assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
-  type = 4, material = 1
 }
 
 t_mat = {
@@ -53,6 +44,45 @@ t_mat_backgrounds = {
   Brown  = {image = 'http://cloud-3.steamusercontent.com/ugc/1465312168065113460/24C65D16A19E192DA6681AFE08E657954741942E/'}
 }
 
+t_mat_stamps = {
+  exile = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925379188/08F2802D9AB897AC20B95C8F781F769BCA893EE3/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072144/EC7D6388A9B6BB1C2B1C8D68B0D1D5DC78AE2692/"
+  },
+  library = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925380653/82495D1D3C027EF623CC6AE073C0935CC8B4E257/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930073327/271089824932FDD367ED9030390C36A5CE6FB150/"
+  },
+  grave = {
+    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925381462/7EB0FF42A570C86E172EA7E4DE82ED152ABABA45/",
+    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072957/B9143AB2C0A0F4ADE9AF75092D91F91C3262B5EA/"
+  }
+}
+
+t_mat_decals = {
+  {
+    name     = 'Exile',
+    url      = t_mat_stamps.exile["Black"],
+    position = {-7.25,1,-5},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  },
+  {
+    name     = 'Library',
+    url      = t_mat_stamps.library["Black"],
+    position = {-7.25,1,0},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  },
+  {
+    name     = 'Graveyard',
+    url      = t_mat_stamps.grave["Black"],
+    position = {-7.25,1,5},
+    rotation = {90,180,0},
+    scale    = {1.5, 1.5, 1.5}
+  }
+}
+
 --==================================
 --= Begin utility functions        =
 --==================================
@@ -61,7 +91,7 @@ function validateObject(_name, _params, _color)
   local _name = _name
   local _params = _params
   local _color = _color or 'Grey'
-  if m_data[_color] == nil then m_data[_color] = t_mat end
+  if m_data[_color] == nil then print("new mat") m_data[_color] = t_mat end
   local _object = getObjectFromGUID(m_data[_color].objects[_name])
 
   if _object == nil then
@@ -70,23 +100,176 @@ function validateObject(_name, _params, _color)
   else
     _object.setPosition(_params.position)
     _object.setRotation(_params.rotation)
-    Wait.time(function() print(_params) _params.callback_function(_object) end, 0.6)
+    Wait.time(function() _params.callback_function(_object) end, 0.6)
   end
-  Wait.time(function() stashObject(_name, _object, _color) end, 0.6)
+  Wait.time(function() finalizeObject(_name, _object, _color) end, 0.6)
   return _object
 end
 
-function stashObject(_name, _obj, _color) m_data[_color].objects[_name] = _obj.getGUID() end
+function finalizeObject(_name, _obj, _color)
+  m_data[_color].objects[_name] = _obj.getGUID()
+end
 
 function freezeObject(_obj)
   _obj.interactable = false
   _obj.setLock(true)
-  _obj.setColorTint(t.name)
+  --_obj.setColorTint(t.name)
+end
+
+function allBut(_color)
+  local players = {}
+  for key, color in pairs(Color.list) do
+    if color ~= _color then
+      table.insert(players,color)
+    end
+  end
+  return players
+end
+
+-- Field utility functions
+
+function count_hand(_color)
+  local handObjects = Player[_color].getHandObjects(1)
+  local objectCount = 0 --set to -1 because an object is still counted as being in hand when it leaves the zone
+  for j, obj in ipairs(handObjects) do
+      if obj.tag == "Card" then
+          objectCount = objectCount+1
+      end
+  end
+  return objectCount
+end
+
+function get_deck(_color)
+  local objects = m_place[_color].z_library.getObjects()
+  for key, object in pairs(objects) do
+    if object.tag == 'Deck' then
+      return object
+    end
+  end
+  return nil
+end
+
+function draw(_i, _color)
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  deck.deal(_i, _color, 1)
+  return true
+end
+
+--==================================
+--= Begin button code for playmat  =
+--==================================
+
+function loadBoardDecals(_place)
+  local _decals = t_mat_decals
+  if _place.custom ~= nil then
+    if _place.custom.mats ~= nil then
+      if _place.mat ~= 0 then
+        if _place.custom.mats[_place.mat] ~= nil then
+          _custom = _place.custom.mats[_place.mat]
+          if _custom ~= nil then
+            _decals[1].url = t_mat_stamps.exile[_custom.decal_exile or "Black"]
+            _decals[2].url = t_mat_stamps.library[_custom.decal_library or "Black"]
+            _decals[3].url = t_mat_stamps.grave[_custom.decal_grave or "Black"]
+          end
+        end
+      end
+    end
+  end
+  _place.board.setDecals(_decals)
+  _place.board.setSnapPoints(_decals)
+end
+
+m_board = {}
+function loadBoardZones(_color)
+  m_place[_color].z_field = validateObject('z_field', {
+    position = m_place[_color].board.positionToWorld({2,0,0}),
+    scale = {26, 2, 16},
+    type = 'ScriptingTrigger',
+    rotation = m_place[_color].board.getRotation()
+  }, _color)
+
+  m_place[_color].z_exile = validateObject('z_exile', {
+    position = m_place[_color].board.positionToWorld({-13,0,-5}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_place[_color].board.getRotation()
+  }, _color)
+
+  m_place[_color]['z_library'] = validateObject('z_library', {
+    position = m_place[_color].board.positionToWorld({-13,0,0}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_place[_color].board.getRotation()
+  }, _color)
+
+  m_place[_color].z_grave = validateObject('z_grave', {
+    position = m_place[_color].board.positionToWorld({-13,0,5}),
+    scale = {3, 2, 4},
+    type = 'ScriptingTrigger',
+    rotation = m_place[_color].board.getRotation()
+  }, _color)
+end
+
+--==================================
+--= Begin button code for modules  =
+--==================================
+
+mb_confirm = function(_obj, _func, _row)
+  _row = _row or 1
+_obj.createButton({click_function = _func, function_owner = self, label = "Confirm",
+  position = {0,0.1,-2.5 + _row}, width = 1500, height = 400, color = "Green", font_size = 200})
+end
+
+mb_back = function(_obj, _func, _row)
+  _row = _row or 1
+  _obj.createButton({click_function = _func, function_owner = self, label = "<- Back",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+mb_cancel = function(_obj, _func, _row)
+  _row = _row or 1
+  _obj.createButton({click_function = _func, function_owner = self, label = "Cancel",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
+end
+
+-- Controller module code
+
+cmf_start = function(_obj, _color, _alt)
+  if _obj.getColorTint() ~= Color.fromString(_color) then
+    broadcastToColor("Don't touch other peoples stuff!!!", _color)
+    return
+  end
+
+  if count_hand(_color) == 0 then
+    if not draw(7, _color) then return end
+  end
+  --m_place[t.name].controller
+end
+
+cmb_start = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'cmf_start', function_owner = self, label = "Start",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
 end
 
 --========================
 --= Begin core functions =
 --========================
+
+function loadBoard(_obj)
+  -- loadBoard()
+  -- loadCounter('CMD_Zone')
+  -- loadCounter('Life')
+  -- loadHandCounter()
+  -- loadControllerModule()
+  --
+  -- settings_module_state = 1
+  -- reset_settings_module()
+end
 
 function setBags(x)
   getObjectFromGUID('b60a9f').setPosition({x, 14.13,-10})
@@ -109,28 +292,76 @@ function setPlace(_side)
 
   local t = t_mat_positions[m_data.table_size][_side]
 
-  m_mats[t.name] = validateObject('settings',{
+  m_place[t.name] = m_place[t.name] or {}
+
+  m_place[t.name].settings = validateObject('settings',{
     type = 'Custom_Token',
     position = Vector{t.pos + (x * 14), 14.13, x*32},
     rotation = Vector{0,180*(_side-1),0},
     custom = {
       image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
     },
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(t.name)
+    end
+  }, t.name)
+
+  local _custom = t_mat_backgrounds[t.name] or t_mat_backgrounds['White']
+  -- if m_data.custom.mats ~= nil and m_data.mat ~= 0 then
+  --   _custom = m_data.custom.mats[m_data.mat] end
+  m_place[t.name].board = validateObject("board", {
+    type = 'Custom_Board',
+    position = m_place[t.name].settings.positionToWorld({-14,0,-12}),
+    rotation = m_place[t.name].settings.getRotation(),
+    custom = _custom,
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(t.name)
+    end
+  }, t.name)
+  loadBoardDecals(m_place[t.name])
+  loadBoardZones(t.name)
+
+  m_place[t.name].pad = validateObject('pad',{
+    type     = 'Custom_AssetBundle',
+    position = Vector{t['pos'], -12.41, x*65},
+    scale    = Vector {5,5,5},
+    custom   = {
+      assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
+      type = 4, material = 1
+    },
     callback_function = freezeObject
   }, t.name)
 
-  local pad = spawnObject({
-    type     = 'Custom_AssetBundle',
-    position = Vector{t['pos'], -12.41, x*65},
-    scale    = Vector {5,5,5}
-  })
-  freezeObject(pad)
-  local cus = spawnObject({
+  m_place[t.name].cus = validateObject('cus',{
     type     = 'Custom_AssetBundle',
     position = Vector{t['pos'], -9.56, x*65},
-    scale    = Vector {12,12,12}
-  })
-  freezeObject(cus)
+    scale    = Vector {12,12,12},
+    custom   = {
+      assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
+      type = 4, material = 0
+    },
+    callback_function = freezeObject
+  }, t.name)
+
+  m_place[t.name].controller = validateObject('controller', {
+    type = 'Custom_Token',
+    position = m_place[t.name].settings.positionToWorld({-28,0,0}),
+    rotation = m_place[t.name].settings.getRotation(),
+    custom = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
+    },
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(t.name)
+    end
+  }, t.name)
+  cmb_start(m_place[t.name].controller, 0)
+
 end
 
 function resize()
@@ -139,7 +370,7 @@ function resize()
   for _, playerReference in ipairs(playerList) do
     i = i + 1
   end
-  i = math.floor(i/2)
+  i = math.ceil(i/2) - 1
   for j = m_data.table_size, i do
     extend()
   end
@@ -251,57 +482,6 @@ function setColor(_color)
   m_color = _color
   m_data.color = _color
   init()
-end
-
-function init()
-  loadBoard()
-  loadCounter('CMD_Zone')
-  loadCounter('Life')
-  loadHandCounter()
-  loadControllerModule()
-
-  settings_module_state = 1
-  reset_settings_module()
-end
-
-function count_hand(_color)
-  local handObjects = Player[_color].getHandObjects(1)
-  local objectCount = 0 --set to -1 because an object is still counted as being in hand when it leaves the zone
-  for j, obj in ipairs(handObjects) do
-      if obj.tag == "Card" then
-          objectCount = objectCount+1
-      end
-  end
-  return objectCount
-end
-
-function get_deck()
-  local objects = z_library.getObjects()
-  for key, object in pairs(objects) do
-    if object.tag == 'Deck' then
-      return object
-    end
-  end
-  return nil
-end
-
-function draw(i)
-  local deck = get_deck()
-  if deck == nil then
-    broadcastToColor("No deck in library slot", m_color)
-    return false
-  end
-  deck.deal(i,m_color,1) return true
-end
-
-function allBut(_color)
-  local players = {}
-  for key, color in pairs(Color.list) do
-    if color ~= _color then
-      table.insert(players,color)
-    end
-  end
-  return players
 end
 
 m_scry = 0
@@ -468,27 +648,7 @@ function onUpdate()
   end
 end
 
---==================================
---= Begin generic code for modules =
---==================================
 
-mb_confirm = function(_func, _row)
-  _row = _row or 1
-  self.createButton({click_function = _func, function_owner = self, label = "Confirm",
-  position = {0,0.1,-2.5 + _row}, width = 1500, height = 400, color = "Green", font_size = 200})
-end
-
-mb_back = function(_func, _row)
-  _row = _row or 1
-  self.createButton({click_function = _func, function_owner = self, label = "<- Back",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
-end
-
-mb_cancel = function(_func, _row)
-  _row = _row or 1
-  self.createButton({click_function = _func, function_owner = self, label = "Cancel",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
-end
 
 --==================================
 --= Begin code for settings module =
@@ -618,20 +778,6 @@ end
 --= Begin code for controller module =
 --====================================
 
-function loadControllerModule()
-  m_controller = validateObject("m_controller", {
-    type = 'Custom_Token',
-    position = self.positionToWorld({-28,0,0}),
-    rotation = self.getRotation(),
-    custom = {
-      image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
-    }
-  })
-  updateControllerModule(m_data.state)
-  m_controller.interactable = false
-  m_controller.setLock(true)
-end
-
 buttons = {
   start = function(pos) m_controller.createButton({
     click_function = "cmf_start", function_owner = self, label = "Start",
@@ -724,10 +870,6 @@ states = {
   end
 }
 
-cmf_start = function()
-  if count_hand(m_color) > 0 then updateControllerModule(2) return end
-  if draw(7) then updateControllerModule(2) end
-end
 cmf_mulligan = function()
   local deck = get_deck()
   if deck == nil then print("no deck in library slot") end
@@ -756,109 +898,7 @@ end
 --= Begin code for board module =
 --===============================
 
-function loadBoard()
-  local _custom = default_mats[m_color] or default_mats['White']
-  if m_data.custom.mats ~= nil and m_data.mat ~= 0 then
-    _custom = m_data.custom.mats[m_data.mat] end
-  m_board = validateObject("m_board", {
-    type = 'Custom_Board',
-    position = self.positionToWorld({-14,0,-12}),
-    rotation = self.getRotation(),
-    custom = _custom,
-    callback_function = function(_obj)
-      _obj.interactable = false
-      _obj.setLock(true)
-      _obj.setColorTint(m_color)
-      loadBoardDecals()
-    end
-  })
 
-  z_field = validateObject("z_field", {
-    position = m_board.positionToWorld({2,0,0}),
-    scale = {26, 2, 16},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_exile = validateObject("z_exile", {
-    position = m_board.positionToWorld({-13,0,-5}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_library = validateObject("z_library", {
-    position = m_board.positionToWorld({-13,0,0}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-
-  z_grave = validateObject("z_grave", {
-    position = m_board.positionToWorld({-13,0,5}),
-    scale = {3, 2, 4},
-    type = 'ScriptingTrigger',
-    rotation = m_board.getRotation()
-  })
-end
-
-function loadBoardDecals()
-  if m_data.custom.mats ~= nil then
-    if m_data.mat == 0 then
-      m_decals[1].url = default_stamps.exile["Black"]
-      m_decals[2].url = default_stamps.library["Black"]
-      m_decals[3].url = default_stamps.grave["Black"]
-    else
-      _custom = m_data.custom.mats[m_data.mat]
-      if _custom ~= nil then
-        m_decals[1].url = default_stamps.exile[_custom.decal_exile or "Black"]
-        m_decals[2].url = default_stamps.library[_custom.decal_library or "Black"]
-        m_decals[3].url = default_stamps.grave[_custom.decal_grave or "Black"]
-      end
-    end
-  end
-  m_board.setDecals(m_decals)
-  m_board.setSnapPoints(m_decals)
-end
-
-default_stamps = {
-  exile = {
-    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925379188/08F2802D9AB897AC20B95C8F781F769BCA893EE3/",
-    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072144/EC7D6388A9B6BB1C2B1C8D68B0D1D5DC78AE2692/"
-  },
-  library = {
-    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925380653/82495D1D3C027EF623CC6AE073C0935CC8B4E257/",
-    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930073327/271089824932FDD367ED9030390C36A5CE6FB150/"
-  },
-  grave = {
-    Black = "http://cloud-3.steamusercontent.com/ugc/1478823218925381462/7EB0FF42A570C86E172EA7E4DE82ED152ABABA45/",
-    White = "http://cloud-3.steamusercontent.com/ugc/1478823218930072957/B9143AB2C0A0F4ADE9AF75092D91F91C3262B5EA/"
-  }
-}
-
-m_decals = {
-  {
-    name     = 'Exile',
-    url      = default_stamps.exile["Black"],
-    position = {-7.25,1,-5},
-    rotation = {90,180,0},
-    scale    = {1.5, 1.5, 1.5}
-  },
-  {
-    name     = 'Library',
-    url      = default_stamps.library["Black"],
-    position = {-7.25,1,0},
-    rotation = {90,180,0},
-    scale    = {1.5, 1.5, 1.5}
-  },
-  {
-    name     = 'Graveyard',
-    url      = default_stamps.grave["Black"],
-    position = {-7.25,1,5},
-    rotation = {90,180,0},
-    scale    = {1.5, 1.5, 1.5}
-  }
-}
 
 mats_max = 0
 m_data.mat = 0
