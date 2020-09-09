@@ -206,9 +206,9 @@ function reset_board(_color)
   end
 end
 
---==================================
---= Begin button code for playmat  =
---==================================
+--==============================================================================
+--= Begin button code for playmat                                              =
+--==============================================================================
 
 function loadBoardDecals(_place)
   local _decals = t_mat_decals
@@ -261,9 +261,9 @@ function loadBoardZones(_color)
   }, _color)
 end
 
---======================================
---= Begin code for hand counter module =
---======================================
+--==============================================================================
+--= Begin code for hand counter module                                         =
+--==============================================================================
 function loadHandCounter(_color)
   m_place[_color].handCounter = validateObject("m_handCounter", {
     type     = 'Custom_Token',
@@ -310,27 +310,26 @@ function countHandCardsEvent(_zome, _obj)
 end
 
 function countHandCards(_color)
-  print("trigger ".._color)
-    local objectCount = count_hand(_color)
-    if objectCount > 9 then
-        m_place[_color].handCounter.editButton({
-            index = 0,
-            label = objectCount,
-            tooltip = objectCount.." cards in hand",
-            width = 900
-        })
-    else
-        m_place[_color].handCounter.editButton({
-            index = 0,
-            label = objectCount,
-            tooltip = objectCount.." cards in hand",
-            width = 600
-        })
-    end
+  local objectCount = count_hand(_color)
+  if objectCount > 9 then
+      m_place[_color].handCounter.editButton({
+          index = 0,
+          label = objectCount,
+          tooltip = objectCount.." cards in hand",
+          width = 900
+      })
+  else
+      m_place[_color].handCounter.editButton({
+          index = 0,
+          label = objectCount,
+          tooltip = objectCount.." cards in hand",
+          width = 600
+      })
+  end
 end
 
 --==============================================================================
---= Begin code for counters modules                                            =
+--= Begin code for counter modules                                             =
 --==============================================================================
 m_counters = {}
 count_CMDR = 0
@@ -496,9 +495,10 @@ function loadCounter(_counter, _color)
   m_counters[_counter] = validateObject("cntr_".._counter, counter, _color)
 end
 
---==================================
---= Begin button code for modules  =
---==================================
+--==============================================================================
+--= Begin module button code                                                   =
+--==============================================================================
+
 mf_validate = function(_obj, _color, _alt)
   if _obj.getColorTint() ~= Color.fromString(_color) then
     broadcastToColor("Don't touch other peoples stuff!!!", _color)
@@ -526,7 +526,7 @@ mb_cancel = function(_obj, _func, _row)
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
 end
 
--- Controller module code
+-- Controller module Buttons
 
 cmf_start = function(_obj, _color, _alt)
   if mf_validate(_obj, _color) then return end
@@ -611,17 +611,135 @@ cmb_reset = function(_obj, _row)
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
 end
 
---========================
---= Begin core functions =
---========================
+-- Library Module Buttons
 
-function loadBoard(_obj)
-  -- loadHandCounter()
-  -- loadControllerModule()
-  --
-  -- settings_module_state = 1
-  -- reset_settings_module()
+m_scry = {}
+
+function scry_top(obj, _color, alt_click)
+  obj.setPosition(m_place[_color].z_library.positionToWorld({0,1,0}))
+  obj.clearButtons()
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  obj.setLock(false)
+  deck.putObject(obj)
+  m_scry[_color] = m_scry[_color] - 1
 end
+
+function scry_bottom(obj, _color, alt_click)
+  obj.setPosition(m_place[_color].z_library.positionToWorld({0,-1,0}))
+  obj.clearButtons()
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  obj.setLock(false)
+  deck.putObject(obj)
+  m_scry[_color] = m_scry[_color] - 1
+end
+
+function to_grave(obj, _color, alt_click)
+  obj.setLock(false)
+  obj.setPosition(m_place[_color].z_grave.positionToWorld({0,1,0}))
+  --obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  m_scry[_color] = m_scry[_color] - 1
+end
+
+function scry_hand(obj, _color, alt_click)
+  obj.deal(1,_color,1)
+  obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  obj.setLock(false)
+  m_scry[_color] = m_scry[_color] - 1
+end
+
+function scry_field(obj, _color, alt_click)
+  obj.setPosition(m_place[_color].z_field.positionToWorld({0,1,0}))
+  obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  obj.setLock(false)
+  m_scry[_color] = m_scry[_color] - 1
+end
+
+lmf_scry = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+
+  m_scry[_color] = m_scry[_color] or 0
+  m_scry[_color] = m_scry[_color] + 1
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  local card = deck.dealToColorWithOffset(
+    {(5*(m_scry[_color]%5+1)-15),5,(5+math.ceil(m_scry[_color]/5)*5)},
+    true, _color)
+  card.setHiddenFrom(allBut(_color))
+  card.setLock(true)
+  card.setRotation(_obj.getRotation())
+  card.createButton{
+    click_function = "scry_top", function_owner = self, label = "Top",
+    position = {2,0,-2}, width = 750, height = 400,
+    color = m_colddor, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_bottom", function_owner = self, label = "Bottom",
+    position = {2,0,-1}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "to_grave", function_owner = self, label = "Grave",
+    position = {2,0,0}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_hand", function_owner = self, label = "Hand",
+    position = {2,0,1}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  card.createButton{
+    click_function = "scry_field", function_owner = self, label = "Field",
+    position = {2,0,2}, width = 750, height = 400,
+    color = m_color, font_size = 200
+  }
+  return true
+end
+
+lmb_scry = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'lmf_scry', function_owner = self, label = "Scry / Surveil",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+lmf_mill = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  local card = deck.takeObject({
+    position = m_place[_color].z_grave.positionToWorld({0,1,0}),
+    rotation = m_place[_color].z_grave.getRotation()
+  })
+end
+
+lmb_mill = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'lmf_mill', function_owner = self, label = "Mill",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+--==============================================================================
+--= Begin core functions                                                       =
+--==============================================================================
 
 function setBags(x)
   getObjectFromGUID('b60a9f').setPosition({x, 14.13,-10})
@@ -714,6 +832,22 @@ function setPlace(_side)
   }, t.name)
   cmb_start(m_place[t.name].controller, 0)
 
+  m_place[t.name].lib_controller = validateObject('lib_controller', {
+    type = 'Custom_Token',
+    position = m_place[t.name].settings.positionToWorld({-32.25,0,-12}),
+    rotation = m_place[t.name].settings.getRotation(),
+    custom = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1461933574032138679/9E9A9FA6BB5EAA23C78F8A6AF5C235AB2BB9795D/'
+    },
+    callback_function = function(_obj)
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(t.name)
+    end
+  }, t.name)
+  lmb_scry(m_place[t.name].lib_controller, 0)
+  lmb_mill(m_place[t.name].lib_controller, 1)
+
   if m_data.settings.mode == 'CMDR' then loadCounter('CMD_Zone', t.name) end
   loadCounter('Life', t.name)
   loadHandCounter(t.name)
@@ -758,9 +892,9 @@ function reset()
   init()
 end
 
---==================================
---= Begin generic code for events  =
---==================================
+--==============================================================================
+--= Begin generic code for events                                              =
+--==============================================================================
 
 function onSave()
   m_save = JSON.encode(m_data)
@@ -807,102 +941,7 @@ function onObjectLeaveScriptingZone(_zone, _obj)
   if countHandCardsEvent(_zone, _obj) then return end
 end
 
-
-
 --[[
-
-m_scry = 0
-function scry()
-  m_scry = m_scry + 1
-  local deck = get_deck()
-  if deck == nil then
-    broadcastToColor("No deck in library slot", m_color)
-    return false
-  end
-  local card = deck.dealToColorWithOffset({(5*(m_scry%5+1)-15),5,(5+math.ceil(m_scry/5)*5)}, true, m_color)
-  card.setHiddenFrom(allBut(m_color))
-  card.setLock(true)
-  card.setRotation(self.getRotation())
-  card.createButton{
-    click_function = "scry_top", function_owner = self, label = "Top",
-    position = {2,0,-2}, width = 750, height = 400,
-    color = m_colddor, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_bottom", function_owner = self, label = "Bottom",
-    position = {2,0,-1}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_grave", function_owner = self, label = "Grave",
-    position = {2,0,0}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_hand", function_owner = self, label = "Hand",
-    position = {2,0,1}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_field", function_owner = self, label = "Field",
-    position = {2,0,2}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  return true
-end
-
-function scry_top(obj, player_clicker_color, alt_click)
-  obj.setPosition(z_library.positionToWorld({0,1,0}))
-  obj.clearButtons()
-  local deck = get_deck()
-  if deck == nil then
-    broadcastToColor("No deck in library slot", m_color)
-    return false
-  end
-  obj.setLock(false)
-  deck.putObject(obj)
-  m_scry = m_scry - 1
-end
-
-function scry_bottom(obj, player_clicker_color, alt_click)
-  obj.setPosition(z_library.positionToWorld({0,-1,0}))
-  obj.clearButtons()
-  local deck = get_deck()
-  if deck == nil then
-    broadcastToColor("No deck in library slot", m_color)
-    return false
-  end
-  obj.setLock(false)
-  deck.putObject(obj)
-  m_scry = m_scry - 1
-end
-
-function scry_grave(obj, player_clicker_color, alt_click)
-  obj.setLock(false)
-  obj.setPosition(z_grave.positionToWorld({0,1,0}))
-  --obj.setRotation(self.getRotation())
-  obj.setHiddenFrom({})
-  obj.clearButtons()
-  m_scry = m_scry - 1
-end
-
-function scry_hand(obj, player_clicker_color, alt_click)
-  obj.deal(1,m_color,1)
-  obj.setRotation(self.getRotation())
-  obj.setHiddenFrom({})
-  obj.clearButtons()
-  obj.setLock(false)
-  m_scry = m_scry - 1
-end
-
-function scry_field(obj, player_clicker_color, alt_click)
-  obj.setPosition(z_field.positionToWorld({0,1,0}))
-  obj.setRotation(self.getRotation())
-  obj.setHiddenFrom({})
-  obj.clearButtons()
-  obj.setLock(false)
-  m_scry = m_scry - 1
-end
 
 function onPlayerTurnStart(player_color_start, player_color_previous)
   if player_color_start == m_color then
