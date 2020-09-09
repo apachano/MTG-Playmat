@@ -6,7 +6,11 @@ m_data = {}
 --=================================
 
 t_data = {
-  table_size = 0
+  table_size = 0,
+  settings = {
+    mode = 'CMDR',
+    friendly = true
+  }
 }
 
 t_mat = {
@@ -91,7 +95,7 @@ function validateObject(_name, _params, _color)
   local _name = _name
   local _params = _params
   local _color = _color or 'Grey'
-  if m_data[_color] == nil then print("new mat") m_data[_color] = t_mat end
+  if m_data[_color] == nil then m_data[_color] = t_mat end
   local _object = getObjectFromGUID(m_data[_color].objects[_name])
 
   if _object == nil then
@@ -113,7 +117,6 @@ end
 function freezeObject(_obj)
   _obj.interactable = false
   _obj.setLock(true)
-  --_obj.setColorTint(t.name)
 end
 
 function allBut(_color)
@@ -140,6 +143,7 @@ function count_hand(_color)
 end
 
 function get_deck(_color)
+  if m_place[_color] == nil then print ("no mat for ".._color) return end
   local objects = m_place[_color].z_library.getObjects()
   for key, object in pairs(objects) do
     if object.tag == 'Deck' then
@@ -149,7 +153,8 @@ function get_deck(_color)
   return nil
 end
 
-function draw(_i, _color)
+function draw(_color, _i)
+  _i = _i or 1
   local deck = get_deck(_color)
   if deck == nil then
     broadcastToColor("No deck in library slot", _color)
@@ -157,6 +162,47 @@ function draw(_i, _color)
   end
   deck.deal(_i, _color, 1)
   return true
+end
+
+function untap(_color)
+  local objects = m_place[_color].z_field.getObjects()
+  for key, object in pairs(objects) do
+    if object.tag == 'Card'
+    then
+      local old = object.getRotation()
+      object.setRotationSmooth(
+        Vector(old.x,m_place[_color].board.getRotation().y,old.z)
+      )
+    end
+  end
+end
+
+function reset_board(_color)
+  -- for key, counter in pairs(m_counters) do
+  --   ctr_reset(counter)
+  -- end
+  local deck = get_deck(_color)
+  -- deck.reset()
+  for key, object in pairs(Player[_color].getHandObjects()) do
+    if object.tag == 'Card' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(m_place[_color].z_field.getObjects()) do
+    if object.tag == 'Card' or object.tag == 'Deck' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(m_place[_color].z_grave.getObjects()) do
+    if object.tag == 'Card' or object.tag == 'Deck' then
+      deck.putObject(object)
+    end
+  end
+  for key, object in pairs(m_place[_color].z_exile.getObjects()) do
+    if object.tag == 'Card' or object.tag == 'Deck' then
+      deck.putObject(object)
+    end
+  end
 end
 
 --==================================
@@ -185,14 +231,14 @@ end
 
 m_board = {}
 function loadBoardZones(_color)
-  m_place[_color].z_field = validateObject('z_field', {
+  m_place[_color]['z_field'] = validateObject('z_field', {
     position = m_place[_color].board.positionToWorld({2,0,0}),
     scale = {26, 2, 16},
     type = 'ScriptingTrigger',
     rotation = m_place[_color].board.getRotation()
   }, _color)
 
-  m_place[_color].z_exile = validateObject('z_exile', {
+  m_place[_color]['z_exile'] = validateObject('z_exile', {
     position = m_place[_color].board.positionToWorld({-13,0,-5}),
     scale = {3, 2, 4},
     type = 'ScriptingTrigger',
@@ -206,7 +252,7 @@ function loadBoardZones(_color)
     rotation = m_place[_color].board.getRotation()
   }, _color)
 
-  m_place[_color].z_grave = validateObject('z_grave', {
+  m_place[_color]['z_grave'] = validateObject('z_grave', {
     position = m_place[_color].board.positionToWorld({-13,0,5}),
     scale = {3, 2, 4},
     type = 'ScriptingTrigger',
@@ -217,11 +263,19 @@ end
 --==================================
 --= Begin button code for modules  =
 --==================================
+mf_validate = function(_obj, _color, _alt)
+  if _obj.getColorTint() ~= Color.fromString(_color) then
+    broadcastToColor("Don't touch other peoples stuff!!!", _color)
+    return true
+  end
+  return false
+end
 
-mb_confirm = function(_obj, _func, _row)
+mb_confirm = function(_obj, _func, _row, _color)
   _row = _row or 1
+  _color = _color or "Green"
 _obj.createButton({click_function = _func, function_owner = self, label = "Confirm",
-  position = {0,0.1,-2.5 + _row}, width = 1500, height = 400, color = "Green", font_size = 200})
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = _color, font_size = 200})
 end
 
 mb_back = function(_obj, _func, _row)
@@ -239,21 +293,86 @@ end
 -- Controller module code
 
 cmf_start = function(_obj, _color, _alt)
-  if _obj.getColorTint() ~= Color.fromString(_color) then
-    broadcastToColor("Don't touch other peoples stuff!!!", _color)
-    return
-  end
+  if mf_validate(_obj, _color) then return end
 
   if count_hand(_color) == 0 then
-    if not draw(7, _color) then return end
+    if not draw(_color, 7) then return end
   end
-  --m_place[t.name].controller
+  _obj.clearButtons()
+  mb_confirm(_obj, 'cmf_ready', 3)
+  _obj.createButton({click_function = 'cmf_mulligan', function_owner = self, label = "Mulligan",
+  position = {0,0.1,-1.5}, width = 1500, height = 400, color = "White", font_size = 200})
 end
 
 cmb_start = function(_obj, _row)
   _row = _row or 0
   _obj.createButton({click_function = 'cmf_start', function_owner = self, label = "Start",
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+cmf_mulligan = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+
+  local deck = get_deck(_color)
+  if deck == nil then return end
+  for key, object in pairs(Player[_color].getHandObjects()) do
+    if object.tag == 'Card' then deck.putObject(object) end
+  end
+  deck.shuffle()
+  Wait.time(function() draw(_color, 7) end, 0.3, 1)
+end
+
+cmf_ready = function(_obj, _color, _alt)
+  _obj.clearButtons()
+  cmb_upkeep(_obj, 0)
+  cmb_untap_draw(_obj, 1)
+  cmb_reset(_obj, 3)
+end
+
+cmf_draw = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  draw(_color, 1)
+end
+
+cmf_untap = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  untap(_color)
+end
+
+cmb_untap_draw = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'cmf_untap', function_owner = self, label = "Untap",
+  position = {-0.8,0.1,-1.5 + _row}, width = 700, height = 400, color = "White", font_size = 200})
+  _obj.createButton({click_function = 'cmf_draw', function_owner = self, label = "Draw",
+  position = {0.8,0.1,-1.5 + _row}, width = 700, height = 400, color = "White", font_size = 200})
+end
+
+cmf_upkeep = function(_obj, _color, _alt) untap(_color) draw(_color, 1) end
+
+cmb_upkeep = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'cmf_upkeep', function_owner = self, label = "Start Turn",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+cmf_reset_confirm = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  reset_board(_color)
+  _obj.clearButtons()
+  cmb_start(_obj, 0)
+end
+
+cmf_reset = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  _obj.clearButtons()
+  mb_back(_obj, 'cmf_ready', 3)
+  mb_confirm(_obj, 'cmf_reset_confirm', 0)
+end
+
+cmb_reset = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'cmf_reset', function_owner = self, label = "Reset",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
 end
 
 --========================
@@ -325,27 +444,27 @@ function setPlace(_side)
   loadBoardDecals(m_place[t.name])
   loadBoardZones(t.name)
 
-  m_place[t.name].pad = validateObject('pad',{
-    type     = 'Custom_AssetBundle',
-    position = Vector{t['pos'], -12.41, x*65},
-    scale    = Vector {5,5,5},
-    custom   = {
-      assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
-      type = 4, material = 1
-    },
-    callback_function = freezeObject
-  }, t.name)
-
-  m_place[t.name].cus = validateObject('cus',{
-    type     = 'Custom_AssetBundle',
-    position = Vector{t['pos'], -9.56, x*65},
-    scale    = Vector {12,12,12},
-    custom   = {
-      assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
-      type = 4, material = 0
-    },
-    callback_function = freezeObject
-  }, t.name)
+  -- m_place[t.name].pad = validateObject('pad',{
+  --   type     = 'Custom_AssetBundle',
+  --   position = Vector{t['pos'], -12.41, x*65},
+  --   scale    = Vector {5,5,5},
+  --   custom   = {
+  --     assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
+  --     type = 4, material = 1
+  --   },
+  --   callback_function = freezeObject
+  -- }, t.name)
+  --
+  -- m_place[t.name].cus = validateObject('cus',{
+  --   type     = 'Custom_AssetBundle',
+  --   position = Vector{t['pos'], -9.56, x*65},
+  --   scale    = Vector {12,12,12},
+  --   custom   = {
+  --     assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
+  --     type = 4, material = 0
+  --   },
+  --   callback_function = freezeObject
+  -- }, t.name)
 
   m_place[t.name].controller = validateObject('controller', {
     type = 'Custom_Token',
@@ -577,45 +696,6 @@ function scry_field(obj, player_clicker_color, alt_click)
   m_scry = m_scry - 1
 end
 
-function untap()
-  local objects = z_field.getObjects()
-  for key, object in pairs(objects) do
-    if object.tag == 'Card'
-    then
-      local old = object.getRotation()
-      object.setRotationSmooth(Vector(old.x,self.getRotation().y,old.z))
-    end
-  end
-end
-
-function reset()
-  for key, counter in pairs(m_counters) do
-    ctr_reset(counter)
-  end
-  local deck = get_deck()
-  for key, object in pairs(Player[m_color].getHandObjects()) do
-    if object.tag == 'Card' then
-      deck.putObject(object)
-    end
-  end
-  for key, object in pairs(z_field.getObjects()) do
-    if object.tag == 'Card' or object.tag == 'Deck' then
-      deck.putObject(object)
-    end
-  end
-  for key, object in pairs(z_grave.getObjects()) do
-    if object.tag == 'Card' or object.tag == 'Deck' then
-      deck.putObject(object)
-    end
-  end
-  for key, object in pairs(z_exile.getObjects()) do
-    if object.tag == 'Card' or object.tag == 'Deck' then
-      deck.putObject(object)
-    end
-  end
-  updateControllerModule(1)
-end
-
 function onPlayerTurnStart(player_color_start, player_color_previous)
   if player_color_start == m_color then
     if m_data.counters['Life'] > 0 and m_data.state > 2 then
@@ -647,8 +727,6 @@ function onUpdate()
     m_turnTimer.setValue(m_time)
   end
 end
-
-
 
 --==================================
 --= Begin code for settings module =
@@ -774,131 +852,9 @@ function reset_settings_module()
   end
 end
 
---====================================
---= Begin code for controller module =
---====================================
-
-buttons = {
-  start = function(pos) m_controller.createButton({
-    click_function = "cmf_start", function_owner = self, label = "Start",
-    position = pos, width = 1300, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  ready = function(pos) m_controller.createButton({
-    click_function = "cmf_ready", function_owner = self, label = "Ready",
-    position = pos, width = 1300, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  mulligan = function(pos) m_controller.createButton({
-    click_function = "cmf_mulligan", function_owner = self, label = "Mulligan",
-    position = pos, width = 1300, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  upkeep = function(pos) m_controller.createButton({
-    click_function = "cmf_upkeep", function_owner = self, label = "Upkeep",
-    position = pos, width = 1300, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  untap = function(pos) m_controller.createButton({
-    click_function = "cmf_untap", function_owner = self, label = "Untap",
-    position = pos, width = 600, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  draw = function(pos) m_controller.createButton({
-    click_function = "cmf_draw", function_owner = self, label = "Draw",
-    position = pos, width = 600, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  reset = function(pos) m_controller.createButton({
-    click_function = "cmf_reset", function_owner = self, label = "Reset",
-    position = pos, width = 600, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  reset_confirm = function(pos) m_controller.createButton({
-    click_function = "cmf_reset_confirm", function_owner = self, label = "Reset",
-    position = pos, width = 1300, height = 400,
-    color = "Red", font_size = 200
-  }) end,
-  reset_cancel = function(pos) m_controller.createButton({
-    click_function = "cmf_reset_cancel", function_owner = self, label = "Cancel",
-    position = pos, width = 1300, height = 400,
-    color = "White", font_size = 200
-  }) end,
-  pass = function(pos) m_controller.createButton({
-    click_function = "cmf_pass", function_owner = self, label = "Pass",
-    position = pos, width = 1300, height = 400,
-    color = m_color, font_size = 200
-  }) end,
-  scry = function(pos) m_controller.createButton({
-    click_function = "cmf_scry", function_owner = self, label = "Scry",
-    position = pos, width = 600, height = 400,
-    color = m_color, font_size = 200
-  }) end
-}
-
-states = {
-  function()
-    buttons.start({0,0.1,-1.5})
-  end,
-  function()
-    buttons.ready({0,0.1,-1.5})
-    buttons.mulligan({0,0.1,-0.5})
-  end,
-  function()
-    buttons.upkeep({0,0.1,-1.5})
-    buttons.untap({-0.8,0.1,-0.5})
-    buttons.draw({0.8,0.1,-0.5})
-    buttons.reset({-0.8,0.1,0.5})
-    buttons.scry({0.8,0.1,0.5})
-  end,
-  function()
-    buttons.pass({-0.8,0.1,-1})
-    buttons.untap({-0.8,0.1,11})
-    buttons.draw({0.8,0.1,11})
-    buttons.reset({-0.8,0.1,12})
-    buttons.scry({0.8,0.1,0.5})
-  end,
-  function()
-    buttons.untap({-0.8,0.1,11})
-    buttons.draw({0.8,0.1,11})
-    buttons.reset({-0.8,0.1,12})
-    buttons.scry({0.8,0.1,0.5})
-  end,
-  function()
-    buttons.reset_confirm({0,0.1,-1.5})
-    buttons.reset_cancel({0,0.1,-0.5})
-  end
-}
-
-cmf_mulligan = function()
-  local deck = get_deck()
-  if deck == nil then print("no deck in library slot") end
-  for key, object in pairs(Player[m_color].getHandObjects()) do
-    if object.tag == 'Card' then deck.putObject(object) end
-  end
-  deck.shuffle()
-  Wait.time(function() draw(7) end, 0.3, 1)
-end
-cmf_ready = function() updateControllerModule(3) end
-cmf_draw = function() draw(1) end
-cmf_untap = function() untap() end
-cmf_reset = function() m_data.state_last = m_data.state updateControllerModule(6) end
-cmf_reset_confirm = function() reset() end
-cmf_reset_cancel = function() updateControllerModule(m_data.state_last) end
-cmf_upkeep = function() untap() draw(1) end
-cmf_scry = function() scry(1) end
-
-function updateControllerModule(state)
-  m_data.state = state
-  m_controller.clearButtons()
-  states[m_data.state]()
-end
-
 --===============================
 --= Begin code for board module =
 --===============================
-
-
 
 mats_max = 0
 m_data.mat = 0
