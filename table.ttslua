@@ -10,7 +10,8 @@ t_data = {
   settings = {
     mode = 'CMDR',
     friendly = true
-  }
+  },
+  counters = {}
 }
 
 t_mat = {
@@ -260,6 +261,173 @@ function loadBoardZones(_color)
   }, _color)
 end
 
+--==============================================================================
+--= Begin code for counters modules                                            =
+--==============================================================================
+m_counters = {}
+count_CMDR = 0
+
+function getColorIndex(_color)
+  for key, color in ipairs(Color.list) do
+    if color == _color then return key end
+  end
+end
+
+function ctr_update(_obj)
+  local val = m_data.counters[_obj.getName()]
+  local update = {index = 0, label = tostring(val)}
+  if val >= 99 then
+    update.font_size = 585
+  else
+    update.font_size = 700
+  end
+  _obj.editButton(update)
+end
+
+function ctr_add5(_obj)
+  m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] + 5
+  ctr_update(_obj)
+end
+
+function ctr_sub5(_obj)
+  m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] - 5
+  ctr_update(_obj)
+end
+
+function ctr_reset(_obj)
+  local name = _obj.getName()
+  if string.sub(name,2,5) == "Life" then
+    if m_data.settings.mode == 'CMDR' then
+      m_data.counters[_obj.getName()] = 40
+    else
+      m_data.counters[_obj.getName()] = 20
+    end
+  else
+    m_data.counters[_obj.getName()] = 0
+  end
+  ctr_update(_obj)
+end
+
+function ctr_addsub(_obj, _color, alt_click)
+  if alt_click then
+    m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] - 1
+  else
+    m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] + 1
+  end
+  ctr_update(_obj)
+end
+
+function loadCounter(_counter, _color)
+  local _object = m_place[_color].settings
+  local counter = {
+    type = 'Custom_Token',
+    rotation = _object.getRotation(),
+    custom = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1008185551998055475/15F69038D7C6043496AE49ED55B41A0ABF4EC670/'
+    }}
+
+  if string.sub(_counter,1,5) == "CMDR_" then
+    count_CMDR = count_CMDR + 1
+    local color = string.sub(_counter,6,-1)
+    counter.position = _object.positionToWorld({(-2*count_CMDR)-0.5,0,-22.5})
+    counter.scale = {0.6,0.5,0.6}
+    counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925336741/8093D79A732508151203B3B14F9198E830347F8E/'
+    counter.callback_function = function(_obj)
+      _obj.setName((getColorIndex(_color)-1).._counter)
+      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
+      _obj.interactable = false
+      _obj.setLock(true)
+      _obj.setColorTint(color)
+      _obj.createButton({
+        click_function = 'ctr_addsub', function_owner = self,
+        label = tostring(m_data.counters[_obj.getName()]), tooltip="CMDR Damage",
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 700,
+        position = {0,0.1,0}, width = 900, height = 600
+      })
+      _obj.createButton({
+        click_function = 'ctr_add5', function_owner = self, label = '+5',
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 280,
+        position = {0.7,0.1,1.0}, width = 300, height = 300
+     })
+      _obj.createButton({
+        click_function = 'ctr_reset', function_owner = self, label =  '{R}',
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 180,
+        position = {-0.7,0.1,1.0}, width = 300, height = 300
+      })
+    end
+  elseif string.sub(_counter,1,4) == "Life" then
+    counter.position = _object.positionToWorld({0,0,-23.5})
+    counter.custom   = {
+        image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
+      }
+    counter.callback_function = function(_obj)
+      _obj.setName((getColorIndex(_color)-1).._counter)
+      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 40 end
+      _obj.setLock(true)
+      _obj.interactable = false
+      _obj.setColorTint(_color)
+      _obj.createButton({
+        click_function = 'ctr_addsub', function_owner = self,
+        label = tostring(m_data.counters[_obj.getName()]), tooltip="Total Life",
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 700,
+        position = {-0,0.1,-0.25}, width = 900, height = 600,
+      })
+      _obj.createButton({
+        click_function = 'ctr_add5', function_owner = self, label =  '+5',
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 280,
+        position = {1.2,0.1,-0.45}, width = 250, height = 240
+     })
+     _obj.createButton({
+        click_function = 'ctr_sub5', function_owner = self, label =  '-5',
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 280,
+        position = {-1.3,0.1,-0.45}, width = 250, height = 240
+      })
+      _obj.createButton({
+        click_function = 'ctr_reset', function_owner = self, label =  '{R}',
+        color={0, 0, 0, 1}, font_color={255, 255, 255, 1}, font_size = 180,
+        position = {-0.0,0.1,0.70}, width = 190, height = 180
+      })
+    end
+  elseif string.sub(_counter,1,8) == "CMD_Zone" then
+    counter.position = _object.positionToWorld({-23,0,-23.5})
+    --counter.scale = {1, 0.5, 1.7}
+    counter.custom   = {
+        image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925315472/C2EB85D1C3D7D43FB9B8AD673631F18C6C169AF7/'
+      }
+    counter.callback_function = function(_obj)
+      _obj.setName((getColorIndex(_color)-1)..'_'.._counter)
+      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
+      _obj.setLock(true)
+      _obj.interactable = false
+      _obj.setColorTint(_color)
+      local snaps = {
+        {
+          name             = 'Commander1',
+          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
+          position         = {-1.6,0.25,0},
+          rotation         = {90,180,0}
+        },
+        {
+          name             = 'Commander2',
+          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
+          position         = {1.6,0.25,0},
+          rotation         = {90,180,0}
+        }
+      }
+      _obj.setDecals(snaps)
+      _obj.setSnapPoints(snaps)
+      _obj.createButton({
+        click_function = 'ctr_addsub', function_owner = self,
+        label = tostring(m_data.counters[_obj.getName()]),
+        color = {0,0,0,1}, font_color={255, 255, 255, 1},
+        position = {0,0.1,0}, width = 400, height = 400, font_size = 400
+      })
+    end
+  end
+
+  m_counters[_counter] = validateObject("cntr_".._counter, counter, _color)
+end
+
 --==================================
 --= Begin button code for modules  =
 --==================================
@@ -380,9 +548,6 @@ end
 --========================
 
 function loadBoard(_obj)
-  -- loadBoard()
-  -- loadCounter('CMD_Zone')
-  -- loadCounter('Life')
   -- loadHandCounter()
   -- loadControllerModule()
   --
@@ -480,6 +645,9 @@ function setPlace(_side)
     end
   }, t.name)
   cmb_start(m_place[t.name].controller, 0)
+
+  if m_data.settings.mode == 'CMDR' then loadCounter('CMD_Zone', t.name) end
+  loadCounter('Life', t.name)
 
 end
 
@@ -585,22 +753,6 @@ function onObjectLeaveScriptingZone(zone, leave_object)
     end
     timer_importer = Wait.time(|| check_importer(), 0.15, 0)
   end
-end
-
-function setWhite()  setColor("White") end
-function setBrown()  setColor("Brown") end
-function setRed()    setColor("Red") end
-function setOrange() setColor("Orange") end
-function setYellow() setColor("Yellow") end
-function setGreen()  setColor("Green") end
-function setTeal()   setColor("Teal") end
-function setBlue()   setColor("Blue") end
-function setPurple() setColor("Purple") end
-function setPink()   setColor("Pink") end
-function setColor(_color)
-  m_color = _color
-  m_data.color = _color
-  init()
 end
 
 m_scry = 0
@@ -1002,211 +1154,4 @@ function countHandCards()
         })
     end
 end
-
---==========================================
---= Begin code for special counters module =
---==========================================
-m_counters = {}
-count_CMDR = 0
-
-function getColorIndex(_color)
-  for key, color in ipairs(Color.list) do
-    if color == _color then return key end
-  end
-end
-
-function ctr_update(_obj)
-  local val = m_data.counters[_obj.getName()]
-  local update = {index = 0, label = tostring(val)}
-  if val >= 99 then
-    update.font_size = 585
-  else
-    update.font_size = 700
-  end
-  _obj.editButton(update)
-end
-
-function ctr_add5(_obj)
-  m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] + 5
-  ctr_update(_obj)
-end
-
-function ctr_sub5(_obj)
-  m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] - 5
-  ctr_update(_obj)
-end
-
-function ctr_reset(_obj)
-  local name = _obj.getName()
-  if string.sub(name,1,4) == "Life" then
-    m_data.counters[_obj.getName()] = 40
-  else
-    m_data.counters[_obj.getName()] = 0
-  end
-  ctr_update(_obj)
-end
-
-function ctr_addsub(_obj, _color, alt_click)
-  if alt_click then
-    m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] - 1
-  else
-    m_data.counters[_obj.getName()] = m_data.counters[_obj.getName()] + 1
-  end
-  ctr_update(_obj)
-end
-
-function loadCounter(_counter)
-  local counter = {
-    type = 'Custom_Token',
-    rotation = self.getRotation(),
-    custom = {
-      image = 'http://cloud-3.steamusercontent.com/ugc/1008185551998055475/15F69038D7C6043496AE49ED55B41A0ABF4EC670/'
-    }}
-
-  if string.sub(_counter,1,5) == "CMDR_" then
-    count_CMDR = count_CMDR + 1
-    local color = string.sub(_counter,6,-1)
-    counter.position = self.positionToWorld({(-2*count_CMDR)-0.5,0,-22.5})
-    counter.scale = {0.6,0.5,0.6}
-    counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925336741/8093D79A732508151203B3B14F9198E830347F8E/'
-    counter.callback_function = function(_obj)
-      _obj.setName(_counter)
-      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
-      _obj.interactable = false
-      _obj.setLock(true)
-      _obj.setColorTint(color)
-      _obj.createButton({
-        click_function = 'ctr_addsub',
-        function_owner = self,
-        label = tostring(m_data.counters[_obj.getName()]),
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {0,0.1,0},
-        tooltip= "Total Life",
-        width = 900,
-        height = 600,
-        font_size = 700
-      })
-      _obj.createButton({
-        click_function = 'ctr_add5',
-        function_owner = self,
-        label = '+5',
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {0.7,0.1,1.0},
-        tooltip="+5 Life",
-        width = 300,
-        height = 300,
-        font_size = 280
-     })
-      _obj.createButton({
-        click_function = 'ctr_reset',
-        function_owner = self,
-        label =  '{R}',
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {-0.7,0.1,1.0},
-        tooltip="Reset Life",
-        width = 300,
-        height = 300,
-        font_size = 180
-      })
-    end
-  elseif string.sub(_counter,1,4) == "Life" then
-    counter.position = self.positionToWorld({0,0,-23.5})
-    counter.custom   = {
-        image = 'http://cloud-3.steamusercontent.com/ugc/1013813832079194758/3AB7F311862EBE5564D11FEEB30D3C598B60856A/'
-      }
-    counter.callback_function = function(_obj)
-      _obj.setName(_counter)
-      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 40 end
-      _obj.setLock(true)
-      _obj.interactable = false
-      _obj.setColorTint(m_color)
-      _obj.createButton({
-        click_function = 'ctr_addsub',
-        function_owner = self,
-        label = tostring(m_data.counters[_obj.getName()]),
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {-0,0.1,-0.25},
-        tooltip="Total Life",
-        width = 900,
-        height = 600,
-        font_size = 700
-      })
-      _obj.createButton({
-        click_function = 'ctr_add5',
-        function_owner = self,
-        label =  '+5',
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {1.2,0.1,-0.45},
-        tooltip="+5 Life",
-        width = 250,
-        height = 240,
-        font_size = 280
-     })
-     _obj.createButton({
-        click_function = 'ctr_sub5',
-        function_owner = self, label =  '-5',
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {-1.3,0.1,-0.45},
-        tooltip="-5 Life",
-        width = 250,
-        height = 240,
-        font_size = 280
-      })
-      _obj.createButton({
-        click_function = 'ctr_reset',
-        function_owner = self,
-        label =  '{R}',
-        color={0, 0, 0, 1},
-        font_color={255, 255, 255, 1},
-        position = {-0.0,0.1,0.70},
-        tooltip="Reset Life",
-        width = 190,
-        height = 180,
-        font_size = 180
-      })
-    end
-  elseif string.sub(_counter,1,8) == "CMD_Zone" then
-    counter.position = self.positionToWorld({-23,0,-23.5})
-    --counter.scale = {1, 0.5, 1.7}
-    counter.custom   = {
-        image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925315472/C2EB85D1C3D7D43FB9B8AD673631F18C6C169AF7/'
-      }
-    counter.callback_function = function(_obj)
-      _obj.setName(_counter)
-      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
-      _obj.setLock(true)
-      _obj.interactable = false
-      _obj.setColorTint(m_color)
-      local snaps = {
-        {
-          name             = 'Commander1',
-          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {-1.6,0.25,0},
-          rotation         = {90,180,0}
-        },
-        {
-          name             = 'Commander2',
-          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {1.6,0.25,0},
-          rotation         = {90,180,0}
-        }
-      }
-      _obj.setDecals(snaps)
-      _obj.setSnapPoints(snaps)
-      _obj.createButton({
-        click_function = 'ctr_addsub', function_owner = self,
-        label = tostring(m_data.counters[_obj.getName()]),
-        color = {0,0,0,1}, font_color={255, 255, 255, 1},
-        position = {0,0.1,0}, width = 400, height = 400, font_size = 400
-      })
-    end
-  end
-
-  m_counters[_counter] = validateObject("cntr_".._counter, counter)
-end]]--
+]]--
