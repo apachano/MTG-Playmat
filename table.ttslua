@@ -261,6 +261,74 @@ function loadBoardZones(_color)
   }, _color)
 end
 
+--======================================
+--= Begin code for hand counter module =
+--======================================
+function loadHandCounter(_color)
+  m_place[_color].handCounter = validateObject("m_handCounter", {
+    type     = 'Custom_Token',
+    position = m_place[_color].settings.positionToWorld({-28,0,-23.5}),
+    rotation = m_place[_color].board.getRotation(),
+    custom   = {
+      image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925321835/014E3BB81BA94FB745E015ED14BFE7A56A85D753/'
+    }
+  })
+  m_place[_color].handCounter.setLock(true)
+  m_place[_color].handCounter.interactable = false
+  m_place[_color].handCounter.setColorTint(_color)
+
+  if z_hand == nil then
+    local handTransform = Player[_color].getHandTransform(1)
+    z_hand = validateObject("z_hand", {
+        type              = "ScriptingTrigger",
+        position          = handTransform.position,
+        rotation          = handTransform.rotation,
+        scale             = handTransform.scale,
+    }, _color)
+  end
+  m_place[_color].handCounter.createButton({
+      click_function = "null", function_owner = self, label = "0",
+      color = {0,0,0,1}, font_color={255, 255, 255, 1}, font_size = 1100,
+      position = {0.25, 0.2, 0}, width = 600, height = 800
+  })
+end
+
+function null() return end
+
+timer_hand = {}
+function countHandCardsEvent(_zome, _obj)
+  for key, color in ipairs(Color.list) do
+    if m_place[color] ~= nil then
+      if _zone == m_place[color].z_hand then
+        if timer_hand[color] ~= nil then --checks so we don't try to stop a non ID and get an error
+            Wait.stop(timer_hand[color])
+        end
+        timer_hand[color] = Wait.time(|| countHandCards(color), 0.15, 0) --Add a timer to prevent errors of cards being counted while still in transit
+      end
+    end
+  end
+end
+
+function countHandCards(_color)
+  print("trigger ".._color)
+    local objectCount = count_hand(_color)
+    if objectCount > 9 then
+        m_place[_color].handCounter.editButton({
+            index = 0,
+            label = objectCount,
+            tooltip = objectCount.." cards in hand",
+            width = 900
+        })
+    else
+        m_place[_color].handCounter.editButton({
+            index = 0,
+            label = objectCount,
+            tooltip = objectCount.." cards in hand",
+            width = 600
+        })
+    end
+end
+
 --==============================================================================
 --= Begin code for counters modules                                            =
 --==============================================================================
@@ -648,7 +716,7 @@ function setPlace(_side)
 
   if m_data.settings.mode == 'CMDR' then loadCounter('CMD_Zone', t.name) end
   loadCounter('Life', t.name)
-
+  loadHandCounter(t.name)
 end
 
 function resize()
@@ -731,29 +799,17 @@ function onChat(_msg, _player)
   end
 end
 
+function onObjectEnterScriptingZone(_zone, _obj)
+  if countHandCardsEvent(_zone, _obj) then return end
+end
+
+function onObjectLeaveScriptingZone(_zone, _obj)
+  if countHandCardsEvent(_zone, _obj) then return end
+end
+
+
+
 --[[
-
-function onObjectEnterScriptingZone(zone, enter_object)
-  if zone == z_hand then
-    countHandCardsEvent()
-  elseif zone == z_importer then
-    if timer_importer ~= nil then
-        Wait.stop(timer_importer)
-    end
-    timer_importer = Wait.time(|| check_importer(), 0.15, 0)
-  end
-end
-
-function onObjectLeaveScriptingZone(zone, leave_object)
-  if zone == z_hand then
-    countHandCardsEvent()
-  elseif zone == z_importer then
-    if timer_importer ~= nil then
-        Wait.stop(timer_importer)
-    end
-    timer_importer = Wait.time(|| check_importer(), 0.15, 0)
-  end
-end
 
 m_scry = 0
 function scry()
@@ -1094,64 +1150,4 @@ function delete_mat()
   change_playmat()
 end
 
---======================================
---= Begin code for hand counter module =
---======================================
-function loadHandCounter()
-  m_handCounter = validateObject("m_handCounter", {
-    type     = 'Custom_Token',
-    position = self.positionToWorld({-28,0,-23.5}),
-    rotation = self.getRotation(),
-    custom   = {
-      image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925321835/014E3BB81BA94FB745E015ED14BFE7A56A85D753/'
-    }
-  })
-  m_handCounter.setLock(true)
-  m_handCounter.interactable = false
-  m_handCounter.setColorTint(m_color)
-
-  if z_hand == nil then
-    local handTransform = Player[m_color].getHandTransform(1)
-    z_hand = validateObject("z_hand", {
-        type              = "ScriptingTrigger",
-        position          = handTransform.position,
-        rotation          = handTransform.rotation,
-        scale             = handTransform.scale,
-    })
-  end
-  m_handCounter.createButton({
-      click_function = "null", function_owner = self,
-      label = "0",
-      color = {0,0,0,1},
-      font_color={255, 255, 255, 1},
-      position = {0.25, 0.2, 0},
-      width = 600, height = 800, font_size = 1100
-  })
-end
-
-function countHandCardsEvent()
-  if timer_hand ~= nil then --checks so we don't try to stop a non ID and get an error
-      Wait.stop(timer_hand)
-  end
-  timer_hand = Wait.time(|| countHandCards(), 0.15, 0) --Add a timer to prevent errors of cards being counted while still in transit
-end
-
-function countHandCards()
-    local objectCount = count_hand(m_color)
-    if objectCount > 9 then
-        m_handCounter.editButton({
-            index = 0,
-            label = objectCount,
-            tooltip = objectCount.." cards in hand",
-            width = 900
-        })
-    else
-        m_handCounter.editButton({
-            index = 0,
-            label = objectCount,
-            tooltip = objectCount.." cards in hand",
-            width = 600
-        })
-    end
-end
 ]]--
