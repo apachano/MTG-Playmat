@@ -332,7 +332,6 @@ end
 --= Begin code for counter modules                                             =
 --==============================================================================
 m_counters = {}
-count_CMDR = 0
 
 function getColorIndex(_color)
   for key, color in ipairs(Color.list) do
@@ -394,9 +393,10 @@ function loadCounter(_counter, _color)
     }}
 
   if string.sub(_counter,1,5) == "CMDR_" then
-    count_CMDR = count_CMDR + 1
+    m_place[_color].count_CMDR = m_place[_color].count_CMDR or 0
+    m_place[_color].count_CMDR = m_place[_color].count_CMDR + 1
     local color = string.sub(_counter,6,-1)
-    counter.position = _object.positionToWorld({(-2*count_CMDR)-0.5,0,-22.5})
+    counter.position = _object.positionToWorld({(-2*m_place[_color].count_CMDR)-0.5,0,-22.5})
     counter.scale = {0.6,0.5,0.6}
     counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925336741/8093D79A732508151203B3B14F9198E830347F8E/'
     counter.callback_function = function(_obj)
@@ -507,63 +507,61 @@ mf_validate = function(_obj, _color, _alt)
   return false
 end
 
-mb_template = function(_params)
-
+mb_create = function(_obj, _params)
+  _params.row            = _params.row            or 0
+  _params.click_function = _params.click_function or "null"
+  _params.function_owner = _params.function_owner or self
+  _params.label          = _params.label          or "Button"
+  _params.width          = _params.width          or 1500
+  _params.height         = _params.height         or 400
+  _params.color          = _params.color          or "White"
+  _params.font_size      = _params.font_size      or 200
+  _params.position       = _params.position       or {0,0.1,-1.5 + _params.row}
+  _obj.createButton(_params)
 end
 
 mb_confirm = function(_obj, _func, _row, _color)
-  _row = _row or 1
   _color = _color or "Green"
-_obj.createButton({click_function = _func, function_owner = self, label = "Confirm",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = _color, font_size = 200})
+  mb_create(_obj,
+    {click_function = _func, label = "Confirm", row = _row, color = _color})
 end
 
 mb_back = function(_obj, _func, _row)
-  _row = _row or 1
-  _obj.createButton({click_function = _func, function_owner = self, label = "<- Back",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+  mb_create(_obj, {click_function = _func, label = "<- Back", row = _row})
 end
 
-mb_cancel = function(_obj, _func, _row)
-  _row = _row or 1
-  _obj.createButton({click_function = _func, function_owner = self, label = "Cancel",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
+mb_cancel = function(_obj, _func, _row, _color)
+  _color = _color or "Red"
+  mb_create(_obj,
+    {click_function = _func, label = "Cancel", row = _row, color = _color})
 end
 
 -- Settings Module Buttons
 
 smf_home = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color, _alt) then return end
   _obj.clearButtons()
-  smb_settings(_obj, 0)
+  mb_create(_obj, {click_function = 'smf_settings', label = "Settings", row = 0})
 end
 
 smf_settings = function(_obj, _color, _alt)
-  mf_validate(_obj, _color, _alt)
+  if mf_validate(_obj, _color, _alt) then return end
   _obj.clearButtons()
   mb_back(_obj, "smf_home", 0)
-  smb_autoupkeep(_obj, 1, _color)
-end
-
-smb_settings = function(_obj, _row)
-  _obj.createButton({click_function = 'smf_settings', function_owner = self, label = "Settings",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+  if m_data[_color].settings.autoupkeep then
+    mb_create(_obj, {click_function = 'smf_autoupkeep',
+      label = "Autoupkeep: On", row = 1, color = "Green"})
+  else
+    mb_create(_obj, {click_function = 'smf_autoupkeep',
+      label = "Autoupkeep: Off", row = 1, color = "Red"})
+  end
 end
 
 smf_autoupkeep = function(_obj, _color, _alt)
-  mf_validate(_obj, _color, _alt)
+  if mf_validate(_obj, _color, _alt) then return end
   if m_data[_color].settings.autoupkeep then m_data[_color].settings.autoupkeep = false
   else m_data[_color].settings.autoupkeep = true end
   smf_settings(_obj, _color, _alt)
-end
-
-smb_autoupkeep = function(_obj, _row, _color)
-  _row = _row or 0
-  local _col = "Red"
-  local _label = "Autoupkeep: Off"
-  if m_data[_color].settings.autoupkeep then _col = "Green" _label = "Autoupkeep: On" end
-
-  _obj.createButton({click_function = 'smf_autoupkeep', function_owner = self, label = _label,
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = _col, font_size = 200})
 end
 
 -- Controller module Buttons
@@ -815,7 +813,7 @@ function setPlace(_side)
       _obj.interactable = false
       _obj.setLock(true)
       _obj.setColorTint(t.name)
-      smf_home(m_place[t.name].settings)
+      smf_home(m_place[t.name].settings, t.name)
     end
   }, t.name)
 
@@ -889,7 +887,15 @@ function setPlace(_side)
   lmb_scry(m_place[t.name].lib_controller, 0)
   lmb_mill(m_place[t.name].lib_controller, 1)
 
-  if m_data.settings.mode == 'CMDR' then loadCounter('CMD_Zone', t.name) end
+  if m_data.settings.mode == 'CMDR' then
+    loadCounter('CMD_Zone', t.name)
+    for key, mat in pairs(m_place) do
+      if key ~= t.name then
+        loadCounter('CMDR_'..key, t.name)
+        loadCounter('CMDR_'..t.name, key)
+      end
+    end
+  end
   loadCounter('Life', t.name)
   loadHandCounter(t.name)
 end
@@ -925,6 +931,7 @@ function extend()
 end
 
 function init()
+  self.clearButtons()
   resize()
 end
 
@@ -947,7 +954,8 @@ function onLoad(saved_data)
     m_data = JSON.decode(saved_data)
   else
     m_data = t_data
-    init()
+    self.createButton({click_function = 'init', function_owner = self, label = "Start",
+    position = {0,0.5,0}, width = 1000, height = 500, color = "White", font_size = 200})
   end
 
   -- local pos = {
