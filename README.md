@@ -55,5 +55,4 @@ These are just a few ideas I have for improving the mats in the future. Suggesti
   - Move tokens off board on reset
 - Alternate playmode
   - Standard / Modern (Life starts at 20, dont spawn commander related stuff)
-- Mill button
 - Discard reminder on turn pass
