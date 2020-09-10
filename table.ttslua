@@ -507,6 +507,10 @@ mf_validate = function(_obj, _color, _alt)
   return false
 end
 
+mb_template = function(_params)
+
+end
+
 mb_confirm = function(_obj, _func, _row, _color)
   _row = _row or 1
   _color = _color or "Green"
@@ -524,6 +528,42 @@ mb_cancel = function(_obj, _func, _row)
   _row = _row or 1
   _obj.createButton({click_function = _func, function_owner = self, label = "Cancel",
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "Red", font_size = 200})
+end
+
+-- Settings Module Buttons
+
+smf_home = function(_obj, _color, _alt)
+  _obj.clearButtons()
+  smb_settings(_obj, 0)
+end
+
+smf_settings = function(_obj, _color, _alt)
+  mf_validate(_obj, _color, _alt)
+  _obj.clearButtons()
+  mb_back(_obj, "smf_home", 0)
+  smb_autoupkeep(_obj, 1, _color)
+end
+
+smb_settings = function(_obj, _row)
+  _obj.createButton({click_function = 'smf_settings', function_owner = self, label = "Settings",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+smf_autoupkeep = function(_obj, _color, _alt)
+  mf_validate(_obj, _color, _alt)
+  if m_data[_color].settings.autoupkeep then m_data[_color].settings.autoupkeep = false
+  else m_data[_color].settings.autoupkeep = true end
+  smf_settings(_obj, _color, _alt)
+end
+
+smb_autoupkeep = function(_obj, _row, _color)
+  _row = _row or 0
+  local _col = "Red"
+  local _label = "Autoupkeep: Off"
+  if m_data[_color].settings.autoupkeep then _col = "Green" _label = "Autoupkeep: On" end
+
+  _obj.createButton({click_function = 'smf_autoupkeep', function_owner = self, label = _label,
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = _col, font_size = 200})
 end
 
 -- Controller module Buttons
@@ -775,6 +815,7 @@ function setPlace(_side)
       _obj.interactable = false
       _obj.setLock(true)
       _obj.setColorTint(t.name)
+      smf_home(m_place[t.name].settings)
     end
   }, t.name)
 
@@ -941,43 +982,19 @@ function onObjectLeaveScriptingZone(_zone, _obj)
   if countHandCardsEvent(_zone, _obj) then return end
 end
 
---[[
-
 function onPlayerTurnStart(player_color_start, player_color_previous)
-  if player_color_start == m_color then
-    if m_data.counters['Life'] > 0 and m_data.state > 2 then
-      m_turnTimer = spawnObject({
-        type     = '3DText',
-        position = self.getPosition() + Vector(-19,1,15),
-        rotation = self.getRotation()
-      })
-      m_time = 0
-      if m_data.settings.autoupkeep then
-        untap()
-        draw(1)
-        updateControllerModule(4)
-      else
-        updateControllerModule(3)
-      end
-    else
-      Turns.turn_color = Turns.getNextTurnColor()
+  if m_data.counters['Life'] > 0 and m_data.state > 2 then
+    if m_data.settings.autoupkeep then
+      untap(player_color_start)
+      draw(player_color_start, 1)
     end
-  elseif player_color_previous == m_color then
-    destroyObject(m_turnTimer)
-    updateControllerModule(5)
+  else
+    Turns.turn_color = Turns.getNextTurnColor()
   end
 end
 
-function onUpdate()
-  if m_turnTimer ~= nil then
-    m_time = m_time + Time.delta_time
-    m_turnTimer.setValue(m_time)
-  end
-end
 
---==================================
---= Begin code for settings module =
---==================================
+--[[
 
 function check_importer()
   local objects = z_importer.getObjects()
@@ -1000,17 +1017,6 @@ smb_mat_switch_stamp = function(_row)
     position = {0,0.1,-2.5 + _row}, width = 1500, height = 400,
     color = m_color, font_size = 200
   })
-end
-smf_settings = function() settings_module_state = 2 reset_settings_module() end
-smb_back = function() self.createButton({
-    click_function = "smf_back", function_owner = self, label = "<- Back",
-    position = {0,0.1,-1.5}, width = 1500, height = 400,
-    color = m_color, font_size = 200}) end
-smf_back       = function() settings_module_state = 1 reset_settings_module() end
-smf_autoupkeep = function()
-  if m_data.settings.autoupkeep then m_data.settings.autoupkeep = false
-  else m_data.settings.autoupkeep = true end
-  reset_settings_module()
 end
 smf_save = function() m_importer_token.setDescription(JSON.encode(m_data.custom)) end
 smf_load = function()
@@ -1039,69 +1045,6 @@ smf_importer = function()
   })
   reset_settings_module()
 end
-
-function reset_settings_module()
-  self.clearButtons()
-  if settings_module_state == 0 then
-    for key, color in pairs(Color.list) do
-      if color ~= 'Grey' and color ~= 'Black' then
-        self.createButton({
-          click_function = "set"..color,
-          function_owner = self,
-          position = {(0.8-1.6*(key%2)),0.5,(3-math.ceil(key/2))}, width = 600, height = 400,
-          color = color
-        })
-      end
-    end
-  elseif settings_module_state == 1 then
-    if m_importer_token ~= nil then
-      self.createButton({
-        click_function = "smf_load", function_owner = self, label = "Load",
-        position = {-0.8,0.2,1.5}, width = 700, height = 400,
-        color = m_color, font_size = 200
-      })
-      self.createButton({
-        click_function = "smf_save", function_owner = self, label = "Save",
-        position = {0.8,0.2,1.5}, width = 700, height = 400,
-        color = m_color, font_size = 200
-      })
-    end
-    if m_importer == nil then
-      self.createButton({
-        click_function = "smf_importer", function_owner = self, label = "Importer",
-        position = {0,0.2,1.5}, width = 1500, height = 400,
-        color = m_color, font_size = 200
-      })
-    end
-    self.createButton({
-      click_function = "smf_settings", function_owner = self, label = "Settings",
-      position = {0,0.2,-0.5}, width = 1500, height = 400,
-      color = m_color, font_size = 200
-    })
-  elseif settings_module_state == 2 then
-    smb_back()
-    local _label = "Auto Upkeep Off" local _color = "Red"
-    if m_data.settings.autoupkeep then
-      _label = "Auto Upkeep On" _color = "Green"
-    end
-    self.createButton({
-      click_function = "smf_autoupkeep", function_owner = self,
-      label = _label,
-      position = {0,0.2,-0.5}, width = 1500, height = 400,
-      color = _color,
-      hover_color = "Grey", font_size = 200
-    })
-    self.createButton({
-      click_function = "change_playmat", function_owner = self, label = "Change Playmat",
-      position = {0,0.2,0.5}, width = 1500, height = 400,
-      color = m_color, font_size = 200
-    })
-  end
-end
-
---===============================
---= Begin code for board module =
---===============================
 
 mats_max = 0
 m_data.mat = 0
