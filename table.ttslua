@@ -8,7 +8,7 @@ m_data = {}
 t_data = {
   table_size = 0,
   settings = {
-    mode = 'CMDR',
+    mode = nil,
     friendly = true
   },
   counters = {}
@@ -932,6 +932,7 @@ end
 
 function init()
   self.clearButtons()
+  m_data.settings.mode = "CMDR"
   resize()
 end
 
@@ -973,7 +974,9 @@ function onLoad(saved_data)
 end
 
 function onPlayerConnect(player_id)
-  resize()
+  if m_data.settings.mode ~= nil then
+    resize()
+  end
 end
 
 function onChat(_msg, _player)
