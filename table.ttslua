@@ -1,27 +1,8 @@
 m_place = {}
-m_data = {}
 
 --=================================
 --= Template data                 =
 --=================================
-
-t_data = {
-  table_size = 0,
-  settings = {
-    mode = nil,
-    friendly = true
-  },
-  counters = {}
-}
-
-t_mat = {
-  color = 'Grey',
-  settings = {
-    autoupkeep = false
-  },
-  objects = {},
-  custom = {}
-}
 
 t_mat_positions = {
   {{name = "White",  pos = 0},
@@ -68,21 +49,21 @@ t_mat_decals = {
   {
     name     = 'Exile',
     url      = t_mat_stamps.exile["Black"],
-    position = {-7.25,1,-5},
+    position = {-7.25,0.6,-5},
     rotation = {90,180,0},
     scale    = {1.5, 1.5, 1.5}
   },
   {
     name     = 'Library',
     url      = t_mat_stamps.library["Black"],
-    position = {-7.25,1,0},
+    position = {-7.25,0.6,0},
     rotation = {90,180,0},
     scale    = {1.5, 1.5, 1.5}
   },
   {
     name     = 'Graveyard',
     url      = t_mat_stamps.grave["Black"],
-    position = {-7.25,1,5},
+    position = {-7.25,0.6,5},
     rotation = {90,180,0},
     scale    = {1.5, 1.5, 1.5}
   }
@@ -96,8 +77,17 @@ function validateObject(_name, _params, _color)
   local _name = _name
   local _params = _params
   local _color = _color or 'Grey'
-  if m_data[_color] == nil then m_data[_color] = t_mat end
-  local _object = getObjectFromGUID(m_data[_color].objects[_name])
+  if m_data[_color] == nil then
+    m_data[_color] = {
+      settings = {
+        autoupkeep = false,
+        ready = false
+      },
+      objects = {},
+      custom = {}
+    }
+  end
+    local _object = getObjectFromGUID(m_data[_color].objects[_name])
 
   if _object == nil then
     _object = spawnObject(_params)
@@ -393,10 +383,12 @@ function loadCounter(_counter, _color)
     }}
 
   if string.sub(_counter,1,5) == "CMDR_" then
-    m_place[_color].count_CMDR = m_place[_color].count_CMDR or 0
-    m_place[_color].count_CMDR = m_place[_color].count_CMDR + 1
+    if m_data[_color]['count_CMDR'] == nil then m_data[_color]['count_CMDR'] = 0 end
+    m_data[_color]['count_CMDR'] = m_data[_color]['count_CMDR'] + 1
+    print(_color..m_data[_color]['count_CMDR'])
+    print(m_data[_color])
     local color = string.sub(_counter,6,-1)
-    counter.position = _object.positionToWorld({(-2*m_place[_color].count_CMDR)-0.5,0,-22.5})
+    counter.position = _object.positionToWorld({(-2*m_data[_color]['count_CMDR'])-0.5,0,-22.5})
     counter.scale = {0.6,0.5,0.6}
     counter.custom.image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925336741/8093D79A732508151203B3B14F9198E830347F8E/'
     counter.callback_function = function(_obj)
@@ -457,7 +449,6 @@ function loadCounter(_counter, _color)
     end
   elseif string.sub(_counter,1,8) == "CMD_Zone" then
     counter.position = _object.positionToWorld({-23,0,-23.5})
-    --counter.scale = {1, 0.5, 1.7}
     counter.custom   = {
         image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925315472/C2EB85D1C3D7D43FB9B8AD673631F18C6C169AF7/'
       }
@@ -471,13 +462,13 @@ function loadCounter(_counter, _color)
         {
           name             = 'Commander1',
           url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {-1.6,0.25,0},
+          position         = {-1.6,0.11,0},
           rotation         = {90,180,0}
         },
         {
           name             = 'Commander2',
           url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {1.6,0.25,0},
+          position         = {1.6,0.11,0},
           rotation         = {90,180,0}
         }
       }
@@ -492,7 +483,7 @@ function loadCounter(_counter, _color)
     end
   end
 
-  m_counters[_counter] = validateObject("cntr_".._counter, counter, _color)
+  m_counters[(getColorIndex(_color)-1)..'_'.._counter] = validateObject("cntr_".._counter, counter, _color)
 end
 
 --==============================================================================
@@ -570,18 +561,19 @@ cmf_start = function(_obj, _color, _alt)
   if mf_validate(_obj, _color) then return end
 
   if count_hand(_color) == 0 then
+    local deck = get_deck(_color)
+    if deck == nil then return end
+    deck.shuffle()
     if not draw(_color, 7) then return end
   end
+
   _obj.clearButtons()
   mb_confirm(_obj, 'cmf_ready', 3)
-  _obj.createButton({click_function = 'cmf_mulligan', function_owner = self, label = "Mulligan",
-  position = {0,0.1,-1.5}, width = 1500, height = 400, color = "White", font_size = 200})
+  mb_create(_obj, {click_function = 'cmf_mulligan', label = "Mulligan", row = 0})
 end
 
 cmb_start = function(_obj, _row)
-  _row = _row or 0
-  _obj.createButton({click_function = 'cmf_start', function_owner = self, label = "Start",
-  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+  mb_create(_obj, {click_function = 'cmf_start', label = "Start", row = _row})
 end
 
 cmf_mulligan = function(_obj, _color, _alt)
@@ -597,6 +589,8 @@ cmf_mulligan = function(_obj, _color, _alt)
 end
 
 cmf_ready = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  m_data[_color].settings.ready = true
   _obj.clearButtons()
   cmb_upkeep(_obj, 0)
   cmb_untap_draw(_obj, 1)
@@ -638,6 +632,7 @@ end
 
 cmf_reset = function(_obj, _color, _alt)
   if mf_validate(_obj, _color) then return end
+  m_data[_color].settings.ready = false
   _obj.clearButtons()
   mb_back(_obj, 'cmf_ready', 3)
   mb_confirm(_obj, 'cmf_reset_confirm', 0)
@@ -932,13 +927,30 @@ end
 
 function init()
   self.clearButtons()
+  m_data = m_data or {
+    table_size = 0,
+    settings = {
+      mode = nil,
+      friendly = true
+    },
+    counters = {}
+  }
   m_data.settings.mode = "CMDR"
   resize()
 end
 
 function reset()
-  m_data = t_data
-  init()
+  for key, places in pairs(m_place) do
+    for key, object in pairs(places) do
+      destroyObject(object)
+    end
+  end
+  for key, object in pairs(m_counters) do
+    destroyObject(object)
+  end
+  m_data = nil
+  self.createButton({click_function = 'init', function_owner = self, label = "Start",
+  position = {0,0.5,0}, width = 1000, height = 500, color = "White", font_size = 200})
 end
 
 --==============================================================================
@@ -951,12 +963,15 @@ function onSave()
 end
 
 function onLoad(saved_data)
-  if false then --saved_data ~= "" and saved_data ~= 'null' then
-    m_data = JSON.decode(saved_data)
+  if saved_data == "" or saved_data == 'null' or saved_data == nil then
+    reset()
   else
-    m_data = t_data
-    self.createButton({click_function = 'init', function_owner = self, label = "Start",
-    position = {0,0.5,0}, width = 1000, height = 500, color = "White", font_size = 200})
+    m_data = JSON.decode(saved_data)
+    if m_data == nil or m_data.settings == nil then
+      reset()
+    else
+      init()
+    end
   end
 
   -- local pos = {
@@ -982,6 +997,8 @@ end
 function onChat(_msg, _player)
   if _msg == "table reset" then
     reset()
+  elseif _msg == "print m_data" then
+    print(JSON.encode(m_data))
   end
 end
 
@@ -993,15 +1010,15 @@ function onObjectLeaveScriptingZone(_zone, _obj)
   if countHandCardsEvent(_zone, _obj) then return end
 end
 
-function onPlayerTurnStart(player_color_start, player_color_previous)
-  if m_data.counters['Life'] > 0 and m_data.state > 2 then
-    if m_data.settings.autoupkeep then
-      untap(player_color_start)
-      draw(player_color_start, 1)
-    end
-  else
-    Turns.turn_color = Turns.getNextTurnColor()
-  end
+function onPlayerTurnStart(_start, _previous)
+  -- if m_data.counters[(getColorIndex(_start)-1)..'Life'] > 0 and m_data[_start].settings.ready then
+  --   if m_data[_start].settings.autoupkeep then
+  --     untap(_start)
+  --     draw(_start, 1)
+  --   end
+  -- else
+  --   Turns.turn_color = Turns.getNextTurnColor()
+  -- end
 end
 
 
