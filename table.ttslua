@@ -168,6 +168,41 @@ function untap(_color)
   end
 end
 
+--Adapted from https://github.com/Jophire/Tabletop-Simulator-Workshop-Items/blob/ca2cac5ddff6b119a06a030a09be85e5d44d1cc3/Encoder/Modules/Encoder%20Untapper.lua#L111
+function untap(_color)
+	enc = Global.getVar("Encoder")
+	local ry = m_place[_color].z_field.getRotation()
+	local rr = nil
+	local untaps = true
+	for k,v in pairs(m_place[_color].z_field.getObjects()) do
+		untaps = true
+		if v.tag == 'Card' or v.tag == 'Deck' then
+			if enc ~= nil then
+				if enc.call("APIobjectExist",{obj=v}) then
+					data = enc.call("APIgetOAData",{obj=v})
+					if data["mtg_frozen"] ~= nil then
+						if data["mtg_frozen"].enabled then
+							untaps = false
+						end
+					end
+					if data["mtg_exert"] ~= nil then
+						if data["mtg_exert"].enabled then
+							untaps = false
+							data["mtg_exert"].enabled = false
+							enc.call("APIsetOAData",{obj=v,data=data})
+							enc.call("APIrebuildButtons",{obj=v})
+						end
+					end
+				end
+			end
+			if untaps == true then
+				rr = v.getRotation()
+				v.setRotationSmooth({x=rr.x,y=ry.y,z=rr.z})
+			end
+		end
+	end
+end
+
 function reset_board(_color)
   -- for key, counter in pairs(m_counters) do
   --   ctr_reset(counter)
@@ -385,8 +420,6 @@ function loadCounter(_counter, _color)
   if string.sub(_counter,1,5) == "CMDR_" then
     if m_data[_color]['count_CMDR'] == nil then m_data[_color]['count_CMDR'] = 0 end
     m_data[_color]['count_CMDR'] = m_data[_color]['count_CMDR'] + 1
-    print(_color..m_data[_color]['count_CMDR'])
-    print(m_data[_color])
     local color = string.sub(_counter,6,-1)
     counter.position = _object.positionToWorld({(-2*m_data[_color]['count_CMDR'])-0.5,0,-22.5})
     counter.scale = {0.6,0.5,0.6}
@@ -829,27 +862,27 @@ function setPlace(_side)
   loadBoardDecals(m_place[t.name])
   loadBoardZones(t.name)
 
-  -- m_place[t.name].pad = validateObject('pad',{
-  --   type     = 'Custom_AssetBundle',
-  --   position = Vector{t['pos'], -12.41, x*65},
-  --   scale    = Vector {5,5,5},
-  --   custom   = {
-  --     assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
-  --     type = 4, material = 1
-  --   },
-  --   callback_function = freezeObject
-  -- }, t.name)
-  --
-  -- m_place[t.name].cus = validateObject('cus',{
-  --   type     = 'Custom_AssetBundle',
-  --   position = Vector{t['pos'], -9.56, x*65},
-  --   scale    = Vector {12,12,12},
-  --   custom   = {
-  --     assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
-  --     type = 4, material = 0
-  --   },
-  --   callback_function = freezeObject
-  -- }, t.name)
+  m_place[t.name].pad = validateObject('pad',{
+    type     = 'Custom_AssetBundle',
+    position = Vector{t['pos'], -12.41, x*65},
+    scale    = Vector {5,5,5},
+    custom   = {
+      assetbundle = 'chry.me/tts/3droom/floorpad.unity3d',
+      type = 4, material = 1
+    },
+    callback_function = freezeObject
+  }, t.name)
+
+  m_place[t.name].cus = validateObject('cus',{
+    type     = 'Custom_AssetBundle',
+    position = Vector{t['pos'], -9.56, x*65},
+    scale    = Vector {12,12,12},
+    custom   = {
+      assetbundle = 'chry.me/tts/3droom/cushion_1.unity3d',
+      type = 4, material = 0
+    },
+    callback_function = freezeObject
+  }, t.name)
 
   m_place[t.name].controller = validateObject('controller', {
     type = 'Custom_Token',
