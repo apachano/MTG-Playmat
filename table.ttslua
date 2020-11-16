@@ -120,6 +120,15 @@ function allBut(_color)
   return players
 end
 
+function countPlayers()
+  local playerList = Player.getPlayers()
+  local i = 0
+  for _, playerReference in ipairs(playerList) do
+    i = i + 1
+  end
+  return i
+end
+
 -- Field utility functions
 
 function count_hand(_color)
@@ -204,9 +213,9 @@ function untap(_color)
 end
 
 function reset_board(_color)
-  -- for key, counter in pairs(m_counters) do
-  --   ctr_reset(counter)
-  -- end
+  for key, counter in pairs(m_counters) do
+    ctr_reset(counter)
+  end
   local deck = get_deck(_color)
   -- deck.reset()
   for key, object in pairs(Player[_color].getHandObjects()) do
@@ -454,7 +463,10 @@ function loadCounter(_counter, _color)
       }
     counter.callback_function = function(_obj)
       _obj.setName((getColorIndex(_color)-1).._counter)
-      if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 40 end
+      if m_data.counters[_obj.getName()] == nil then
+        if m_data.settings.mode == "CMDR" then m_data.counters[_obj.getName()] = 40
+        else m_data.counters[_obj.getName()] = 20 end
+      end
       _obj.setLock(true)
       _obj.interactable = false
       _obj.setColorTint(_color)
@@ -803,6 +815,50 @@ lmb_mill = function(_obj, _row)
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
 end
 
+lmf_shuffle = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+  deck.shuffle()
+end
+
+lmb_shuffle = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'lmf_shuffle', function_owner = self, label = "Shuffle",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+-- Main Menu Module Buttons
+
+function mmdraw()
+  self.clearButtons()
+  mmb_start(0)
+  mmb_mode(1)
+end
+
+mmb_start = function(_row)
+  _row = _row or 0
+  self.createButton({click_function = 'init', function_owner = self, label = "Start",
+  position = {0,0.5,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+mmf_mode = function(_obj, _color, _alt)
+  if m_data.settings.mode == "Normal" then
+    m_data.settings.mode = "CMDR"
+  else
+    m_data.settings.mode = "Normal"
+  end
+  mmdraw()
+end
+
+mmb_mode = function(_row)
+  _row = _row or 0
+  self.createButton({click_function = 'mmf_mode', function_owner = self, label = "Mode:"..m_data.settings.mode,
+  position = {0,0.5,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
 --==============================================================================
 --= Begin core functions                                                       =
 --==============================================================================
@@ -914,6 +970,7 @@ function setPlace(_side)
   }, t.name)
   lmb_scry(m_place[t.name].lib_controller, 0)
   lmb_mill(m_place[t.name].lib_controller, 1)
+  lmb_shuffle(m_place[t.name].lib_controller, 2)
 
   if m_data.settings.mode == 'CMDR' then
     loadCounter('CMD_Zone', t.name)
@@ -928,14 +985,9 @@ function setPlace(_side)
   loadHandCounter(t.name)
 end
 
-function resize()
-  local playerList = Player.getPlayers()
-  local i = 0
-  for _, playerReference in ipairs(playerList) do
-    i = i + 1
-  end
-  i = math.ceil(i/2) - 1
-  for j = m_data.table_size, i do
+function resize(_size)
+  _size = _size or math.ceil(countPlayers()/2) - 1
+  for j = m_data.table_size, _size do
     extend()
   end
 end
@@ -960,30 +1012,28 @@ end
 
 function init()
   self.clearButtons()
-  m_data = m_data or {
-    table_size = 0,
-    settings = {
-      mode = nil,
-      friendly = true
-    },
-    counters = {}
-  }
-  m_data.settings.mode = "CMDR"
   resize()
 end
 
 function reset()
+  print(reset)
   for key, places in pairs(m_place) do
     for key, object in pairs(places) do
       destroyObject(object)
     end
   end
+  m_data = {
+    table_size = 0,
+    settings = {
+      mode = "CMDR",
+      friendly = true
+    },
+    counters = {}
+  }
   for key, object in pairs(m_counters) do
     destroyObject(object)
   end
-  m_data = nil
-  self.createButton({click_function = 'init', function_owner = self, label = "Start",
-  position = {0,0.5,0}, width = 1000, height = 500, color = "White", font_size = 200})
+  mmdraw()
 end
 
 --==============================================================================
@@ -1000,9 +1050,13 @@ function onLoad(saved_data)
     reset()
   else
     m_data = JSON.decode(saved_data)
+    print(m_data)
     if m_data == nil or m_data.settings == nil then
       reset()
     else
+      local i = m_data.table_size
+      m_data.table_size = 0
+      resize(i)
       init()
     end
   end
