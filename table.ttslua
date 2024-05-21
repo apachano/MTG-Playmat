@@ -87,7 +87,7 @@ function validateObject(_name, _params, _color)
       custom = {}
     }
   end
-    local _object = getObjectFromGUID(m_data[_color].objects[_name])
+  local _object = getObjectFromGUID(m_data[_color].objects[_name])
 
   if _object == nil then
     _object = spawnObject(_params)
@@ -95,9 +95,9 @@ function validateObject(_name, _params, _color)
   else
     _object.setPosition(_params.position)
     _object.setRotation(_params.rotation)
-    Wait.time(function() _params.callback_function(_object) end, 0.6)
+    Wait.time(function() _params.callback_function(_object) end, 0.8)
   end
-  Wait.time(function() finalizeObject(_name, _object, _color) end, 0.6)
+  Wait.time(function() finalizeObject(_name, _object, _color) end, 0.8)
   return _object
 end
 
@@ -306,7 +306,7 @@ function loadHandCounter(_color)
     custom   = {
       image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925321835/014E3BB81BA94FB745E015ED14BFE7A56A85D753/'
     }
-  })
+  }, _color)
   m_place[_color].handCounter.setLock(true)
   m_place[_color].handCounter.interactable = false
   m_place[_color].handCounter.setColorTint(_color)
@@ -495,8 +495,9 @@ function loadCounter(_counter, _color)
   elseif string.sub(_counter,1,8) == "CMD_Zone" then
     counter.position = _object.positionToWorld({-23,0,-23.5})
     counter.custom   = {
-        image = 'http://cloud-3.steamusercontent.com/ugc/1478823218925315472/C2EB85D1C3D7D43FB9B8AD673631F18C6C169AF7/'
-      }
+        image = 'http://cloud-3.steamusercontent.com/ugc/1858300426108378488/AF4624F3A5B592A8ADC0ECD86FD999B4B7935753/'
+    }
+    counter.scale = {0.85,1,0.85}
     counter.callback_function = function(_obj)
       _obj.setName((getColorIndex(_color)-1)..'_'.._counter)
       if m_data.counters[_obj.getName()] == nil then m_data.counters[_obj.getName()] = 0 end
@@ -507,24 +508,31 @@ function loadCounter(_counter, _color)
         {
           name             = 'Commander1',
           url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {-1.6,0.11,0},
-          rotation         = {90,180,0}
-        },
-        {
-          name             = 'Commander2',
-          url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
-          position         = {1.6,0.11,0},
+          position         = {0,0.11,-.525},
           rotation         = {90,180,0}
         }
+        ,
+        -- {
+        --   name             = 'Commander2',
+        --   url              = "http://cloud-3.steamusercontent.com/ugc/1478823218925334502/D2CC0D67F7A971B58741E27C84B8EFEE6DF2B81D/",
+        --   position         = {1.6,0.11,0},
+        --   rotation         = {90,180,0}
+        -- }
       }
-      _obj.setDecals(snaps)
+      -- _obj.setDecals(snaps)
       _obj.setSnapPoints(snaps)
       _obj.createButton({
         click_function = 'ctr_addsub', function_owner = self,
         label = tostring(m_data.counters[_obj.getName()]),
         color = {0,0,0,1}, font_color={255, 255, 255, 1},
-        position = {0,0.1,0}, width = 400, height = 400, font_size = 400
+        position = {0,0.22,1.9}, width = 400, height = 400, font_size = 400
       })
+      -- _obj.createButton({
+      --   click_function = 'ctr_addsub', function_owner = self,
+      --   label = tostring(m_data.counters[_obj.getName()]),
+      --   color = {0,0,0,1}, font_color={255, 255, 255, 1},
+      --   position = {1.6,0.22,0}, width = 400, height = 400, font_size = 400
+      -- })
     end
   end
 
@@ -612,6 +620,8 @@ cmf_start = function(_obj, _color, _alt)
     if not draw(_color, 7) then return end
   end
 
+  m_data[_color].mul = 7
+
   _obj.clearButtons()
   mb_confirm(_obj, 'cmf_ready', 3)
   mb_create(_obj, {click_function = 'cmf_mulligan', label = "Mulligan", row = 0})
@@ -623,14 +633,21 @@ end
 
 cmf_mulligan = function(_obj, _color, _alt)
   if mf_validate(_obj, _color) then return end
-
+  if not m_data.settings.friendly then
+    m_data[_color].mul = m_data[_color].mul - 1
+    if m_data[_color].mul < 1 then
+      m_data[_color].mul = 1
+    end
+  else
+    m_data[_color].mul = 7
+  end
   local deck = get_deck(_color)
   if deck == nil then return end
   for key, object in pairs(Player[_color].getHandObjects()) do
     if object.tag == 'Card' then deck.putObject(object) end
   end
   deck.shuffle()
-  Wait.time(function() draw(_color, 7) end, 0.3, 1)
+  Wait.time(function() draw(_color, m_data[_color].mul) end, 0.3, 1)
 end
 
 cmf_ready = function(_obj, _color, _alt)
@@ -691,108 +708,178 @@ end
 
 -- Library Module Buttons
 
-m_scry = {}
+-- Card view
+m_view = {}
+m_viewlock = false
 
-function scry_top(obj, _color, alt_click)
+function send_top(obj, _color, alt_click)
+  obj.setLock(false)
+  obj.clearButtons()
+  local deck = get_deck(_color)
   obj.setPosition(m_place[_color].z_library.positionToWorld({0,1,0}))
-  obj.clearButtons()
-  local deck = get_deck(_color)
-  if deck == nil then
-    broadcastToColor("No deck in library slot", _color)
-    return false
+  if deck != nil then
+    deck.putObject(obj)
   end
-  obj.setLock(false)
-  deck.putObject(obj)
-  m_scry[_color] = m_scry[_color] - 1
+  view_pop_slot(obj, _color)
 end
 
-function scry_bottom(obj, _color, alt_click)
-  obj.setPosition(m_place[_color].z_library.positionToWorld({0,-1,0}))
+function send_bottom(obj, _color, alt_click)
+  obj.setLock(false)
   obj.clearButtons()
   local deck = get_deck(_color)
-  if deck == nil then
-    broadcastToColor("No deck in library slot", _color)
-    return false
+  if deck != nil then
+    obj.setPosition(m_place[_color].z_library.positionToWorld({0,-1,0}))
+    deck.putObject(obj)
+  else
+    obj.setPosition(m_place[_color].z_library.positionToWorld({0,1,0}))
   end
-  obj.setLock(false)
-  deck.putObject(obj)
-  m_scry[_color] = m_scry[_color] - 1
+  view_pop_slot(obj, _color)
 end
 
-function to_grave(obj, _color, alt_click)
+function send_grave(obj, _color, alt_click)
   obj.setLock(false)
   obj.setPosition(m_place[_color].z_grave.positionToWorld({0,1,0}))
   --obj.setRotation(self.getRotation())
   obj.setHiddenFrom({})
   obj.clearButtons()
-  m_scry[_color] = m_scry[_color] - 1
+  view_pop_slot(obj, _color)
 end
 
-function scry_hand(obj, _color, alt_click)
+function send_hand(obj, _color, alt_click)
   obj.deal(1,_color,1)
   obj.setRotation(self.getRotation())
   obj.setHiddenFrom({})
   obj.clearButtons()
   obj.setLock(false)
-  m_scry[_color] = m_scry[_color] - 1
+  view_pop_slot(obj, _color)
 end
 
-function scry_field(obj, _color, alt_click)
+function send_field(obj, _color, alt_click)
   obj.setPosition(m_place[_color].z_field.positionToWorld({0,1,0}))
   obj.setRotation(self.getRotation())
   obj.setHiddenFrom({})
   obj.clearButtons()
   obj.setLock(false)
-  m_scry[_color] = m_scry[_color] - 1
+  view_pop_slot(obj, _color)
+end
+
+function send_exile(obj, _color, alt_click)
+  obj.setLock(false)
+  obj.setPosition(m_place[_color].z_exile.positionToWorld({0,1,0}))
+  --obj.setRotation(self.getRotation())
+  obj.setHiddenFrom({})
+  obj.clearButtons()
+  view_pop_slot(obj, _color)
+end
+
+function send_buttons(_card)
+  _card.createButton{
+    click_function = "send_top", function_owner = self, label = "Top",
+    position = {1.75,0,-1}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  _card.createButton{
+    click_function = "send_bottom", function_owner = self, label = "Bottom",
+    position = {3,0,-1}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  _card.createButton{
+    click_function = "send_grave", function_owner = self, label = "Grave",
+    position = {1.75,0,0}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  _card.createButton{
+    click_function = "send_hand", function_owner = self, label = "Hand",
+    position = {3,0,0}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  _card.createButton{
+    click_function = "send_field", function_owner = self, label = "Field",
+    position = {1.75,0,1}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  _card.createButton{
+    click_function = "send_exile", function_owner = self, label = "Exile",
+    position = {3,0,1}, width = 500, height = 300,
+    color = m_color, font_size = 150
+  }
+  return true
+end
+
+function view_get_slot(_color)
+  m_view[_color] = m_view[_color] or {}
+  for i=1, 99 do
+    if m_view[_color][i] == nil then return i end
+  end
+  broadcastToColor("Scry overflow", _color)
+  return nil
+end
+
+function view_pop_slot(_card, _color)
+  for i=1, 99 do
+    if m_view[_color][i] == _card then 
+      m_view[_color][i] = nil 
+      return 
+    end
+  end
+  broadcastToColor("Card not found in view index", _color)
+  return nil
 end
 
 lmf_scry = function(_obj, _color, _alt)
   if mf_validate(_obj, _color) then return end
 
-  m_scry[_color] = m_scry[_color] or 0
-  m_scry[_color] = m_scry[_color] + 1
+  local slot = view_get_slot(_color)
+  if slot == nil then return false end
+
   local deck = get_deck(_color)
   if deck == nil then
     broadcastToColor("No deck in library slot", _color)
     return false
   end
+
   local card = deck.dealToColorWithOffset(
-    {(5*(m_scry[_color]%5+1)-15),5,(5+math.ceil(m_scry[_color]/5)*5)},
+    {(5*(slot%5+1)-15),5,(5+math.ceil(slot/5)*5)},
     true, _color)
+  m_view[_color][slot] = card
   card.setHiddenFrom(allBut(_color))
   card.setLock(true)
   card.setRotation(_obj.getRotation())
-  card.createButton{
-    click_function = "scry_top", function_owner = self, label = "Top",
-    position = {2,0,-2}, width = 750, height = 400,
-    color = m_colddor, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_bottom", function_owner = self, label = "Bottom",
-    position = {2,0,-1}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "to_grave", function_owner = self, label = "Grave",
-    position = {2,0,0}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_hand", function_owner = self, label = "Hand",
-    position = {2,0,1}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
-  card.createButton{
-    click_function = "scry_field", function_owner = self, label = "Field",
-    position = {2,0,2}, width = 750, height = 400,
-    color = m_color, font_size = 200
-  }
+  send_buttons(card)
   return true
 end
 
 lmb_scry = function(_obj, _row)
   _row = _row or 0
   _obj.createButton({click_function = 'lmf_scry', function_owner = self, label = "Scry / Surveil",
+  position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+lmf_reveal = function(_obj, _color, _alt)
+  if mf_validate(_obj, _color) then return end
+
+  local slot = view_get_slot(_color)
+  if slot == nil then return false end
+
+  local deck = get_deck(_color)
+  if deck == nil then
+    broadcastToColor("No deck in library slot", _color)
+    return false
+  end
+
+  local card = deck.dealToColorWithOffset(
+    {(5*(slot%5+1)-15),5,(5+math.ceil(slot/5)*5)},
+    true, _color)
+  m_view[_color][slot] = card
+  card.setLock(true)
+  card.setRotation(_obj.getRotation())
+  send_buttons(card)
+  return true
+end
+
+lmb_reveal = function(_obj, _row)
+  _row = _row or 0
+  _obj.createButton({click_function = 'lmf_reveal', function_owner = self, label = "Reveal",
   position = {0,0.1,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
 end
 
@@ -837,6 +924,7 @@ function mmdraw()
   self.clearButtons()
   mmb_start(0)
   mmb_mode(1)
+  mmb_friendly(2)
 end
 
 mmb_start = function(_row)
@@ -858,6 +946,27 @@ mmb_mode = function(_row)
   _row = _row or 0
   self.createButton({click_function = 'mmf_mode', function_owner = self, label = "Mode:"..m_data.settings.mode,
   position = {0,0.5,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 200})
+end
+
+mmf_friendly = function(_obj, _color, _alt)
+  if m_data.settings.friendly then
+    m_data.settings.friendly = false
+  else
+    m_data.settings.friendly = true
+  end
+  mmdraw()
+end
+
+mmb_friendly = function(_row)
+  _row = _row or 0
+  local _label
+  if m_data.settings.friendly then
+    _label = "Friendly Mulligan"
+  else
+    _label = "Regular Mulligan"
+  end
+  self.createButton({click_function = 'mmf_friendly', function_owner = self, label = _label,
+  position = {0,0.5,-1.5 + _row}, width = 1500, height = 400, color = "White", font_size = 190})
 end
 --==============================================================================
 --= Begin core functions                                                       =
@@ -971,6 +1080,7 @@ function setPlace(_side)
   lmb_scry(m_place[t.name].lib_controller, 0)
   lmb_mill(m_place[t.name].lib_controller, 1)
   lmb_shuffle(m_place[t.name].lib_controller, 2)
+  lmb_reveal(m_place[t.name].lib_controller, 3)
 
   if m_data.settings.mode == 'CMDR' then
     loadCounter('CMD_Zone', t.name)
@@ -983,6 +1093,18 @@ function setPlace(_side)
   end
   loadCounter('Life', t.name)
   loadHandCounter(t.name)
+
+  local pos = {
+    scale = {22, 5, 5},
+  }
+  if (_side == 1) then
+    pos.rotation = {0.00, 180.00, 0.00}
+    pos.position = {t['pos'], 18, 35.00}
+  else
+    pos.rotation = {0.00, 0.00, 0.00}
+    pos.position = {t['pos'], 18, -35.00}
+  end
+  Player[t['name']].setHandTransform(pos, 1)
 end
 
 function resize(_size)
@@ -1012,6 +1134,7 @@ end
 
 function init()
   self.clearButtons()
+  m_data.settings.initialized = true
   resize()
 end
 
@@ -1025,6 +1148,7 @@ function reset()
   m_data = {
     table_size = 0,
     settings = {
+      initialized = false,
       mode = "CMDR",
       friendly = true
     },
@@ -1051,7 +1175,7 @@ function onLoad(saved_data)
   else
     m_data = JSON.decode(saved_data)
     print(m_data)
-    if m_data == nil or m_data.settings == nil then
+    if m_data == nil or m_data.settings == nil or not m_data.settings.initialized then
       reset()
     else
       local i = m_data.table_size
@@ -1061,22 +1185,24 @@ function onLoad(saved_data)
     end
   end
 
-  -- local pos = {
-  --   scale = {22.81, 5.40, 3.07},
-  -- }
-  -- for key,slot in pairs(mat_positions) do
-  --   pos.rotation = {0.00, 180.00, 0.00}
-  --   pos.position = {slot[1]['pos'], 17.7, 35.00}
-  --   Player[slot[1]['name']].setHandTransform(pos, 1)
-  --
-  --   pos.rotation = {0.00, 0.00, 0.00}
-  --   pos.position = {slot[2]['pos'], 17.7, -35.00}
-  --   Player[slot[2]['name']].setHandTransform(pos, 1)
-  -- end
+  local pos = {
+    scale = {22, 5, 5},
+  }
+  for key,slot in pairs(t_mat_positions) do
+    pos.rotation = {0.00, 180.00, 0.00}
+    pos.position = {slot[1]['pos'], 18.5, 35.00}
+    Player[slot[1]['name']].setHandTransform(pos, 1)
+    print("set hand for" .. slot[1]['name'])
+  
+    pos.rotation = {0.00, 0.00, 0.00}
+    pos.position = {slot[2]['pos'], 18.5, -35.00}
+    Player[slot[2]['name']].setHandTransform(pos, 1)
+    print("set hand for" .. slot[2]['name'])
+  end
 end
 
 function onPlayerConnect(player_id)
-  if m_data.settings.mode ~= nil then
+  if m_data.settings.initialized then
     resize()
   end
 end
@@ -1086,6 +1212,8 @@ function onChat(_msg, _player)
     reset()
   elseif _msg == "print m_data" then
     print(JSON.encode(m_data))
+  elseif _msg == "table extend" then
+    extend()
   end
 end
 
@@ -1097,15 +1225,38 @@ function onObjectLeaveScriptingZone(_zone, _obj)
   if countHandCardsEvent(_zone, _obj) then return end
 end
 
+t_start = Time.time
+t_turn = nil
 function onPlayerTurnStart(_start, _previous)
-  -- if m_data.counters[(getColorIndex(_start)-1)..'Life'] > 0 and m_data[_start].settings.ready then
-  --   if m_data[_start].settings.autoupkeep then
-  --     untap(_start)
-  --     draw(_start, 1)
-  --   end
-  -- else
-  --   Turns.turn_color = Turns.getNextTurnColor()
-  -- end
+	if m_place[_previous] ~= nil then 
+		m_place[_previous].board.clearButtons() 
+		m_place[_previous].board.highlightOff("Red")
+	end
+	m_place[_start].board.highlightOn("Red")
+    m_place[_start].board.createButton({
+        click_function = 'passTurn', function_owner = self, 
+        position = {0,0.5,-13}, width = 1500, height = 800, 
+        label = "0", color = "White", font_size = 1000})
+	t_start = Time.time
+	t_turn = _start
+end
+
+function passTurn() 
+	Turns.turn_color = Turns.getNextTurnColor()
+end
+
+function onUpdate()
+	if t_turn ~= nil then
+		if m_place[t_turn] ~= nil then
+			local _t = math.floor(Time.time - t_start)
+			local _btn = {index = 0, label = _t, color = "White"}
+			if _t > 60 and _t % 2 > 0 then
+				_btn.color = "Red"
+			end
+
+			m_place[t_turn].board.editButton(_btn)
+		end
+	end
 end
 
 
